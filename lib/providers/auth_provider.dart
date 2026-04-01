@@ -3,25 +3,20 @@ import '../models/usuario.dart';
 
 /// Provider responsável por gerenciar autenticação e usuários.
 class AuthProvider extends ChangeNotifier {
-  /// Lista de usuários cadastrados (em memória)
+
   final List<Usuario> _usuarios = [];
 
-  /// Usuário atualmente logado
   Usuario? _usuarioLogado;
 
-  /// Getter para o usuário logado
   Usuario? get usuarioLogado => _usuarioLogado;
 
-  /// Verifica se há um usuário logado
   bool get estaLogado => _usuarioLogado != null;
 
-  /// Cadastra um novo usuário. Retorna mensagem de erro ou null se sucesso.
   String? cadastrarUsuario({
     required String nome,
     required String email,
     required String senha,
   }) {
-    // Verifica se já existe um usuário com o mesmo email
     final existente = _usuarios.any(
       (u) => u.email.toLowerCase() == email.toLowerCase(),
     );
@@ -35,7 +30,6 @@ class AuthProvider extends ChangeNotifier {
     return null;
   }
 
-  /// Realiza o login. Retorna mensagem de erro ou null se sucesso.
   String? login({required String email, required String senha}) {
     try {
       final usuario = _usuarios.firstWhere(
@@ -49,14 +43,11 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Realiza o logout
   void logout() {
     _usuarioLogado = null;
     notifyListeners();
   }
 
-  /// Atualiza os dados do perfil do usuário logado.
-  /// Retorna mensagem de erro ou null se sucesso.
   String? atualizarPerfil({
     required String nome,
     required String email,
@@ -64,7 +55,6 @@ class AuthProvider extends ChangeNotifier {
   }) {
     if (_usuarioLogado == null) return 'Nenhum usuário logado.';
 
-    // Verifica se o email já é usado por outro usuário
     final emailEmUso = _usuarios.any(
       (u) =>
           u.id != _usuarioLogado!.id &&
@@ -81,8 +71,6 @@ class AuthProvider extends ChangeNotifier {
     return null;
   }
 
-  /// Redefine a senha de um usuário pelo email.
-  /// Retorna mensagem de erro ou null se sucesso.
   String? redefinirSenha({required String email, required String novaSenha}) {
     try {
       final usuario = _usuarios.firstWhere(

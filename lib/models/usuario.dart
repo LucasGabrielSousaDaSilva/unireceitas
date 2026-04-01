@@ -1,15 +1,9 @@
 /// Modelo que representa um usuário no aplicativo.
 class Usuario {
-  /// Identificador único do usuário
+
   final String id;
-
-  /// Nome do usuário
   String nome;
-
-  /// Email do usuário (usado para login)
   String email;
-
-  /// Senha do usuário
   String senha;
 
   Usuario({
