@@ -3,30 +3,48 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_colors.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class PerfilScreen extends StatefulWidget {
+  const PerfilScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<PerfilScreen> createState() => _PerfilScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _PerfilScreenState extends State<PerfilScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
   final _senhaController = TextEditingController();
   bool _senhaVisivel = false;
+  bool _dadosCarregados = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_dadosCarregados) {
+      final usuario = context.read<AuthProvider>().usuarioLogado;
+      if (usuario != null) {
+        _nomeController.text = usuario.nome;
+        _emailController.text = usuario.email;
+        _senhaController.text = usuario.senha;
+      }
+      _dadosCarregados = true;
+    }
+  }
 
   @override
   void dispose() {
+    _nomeController.dispose();
     _emailController.dispose();
     _senhaController.dispose();
     super.dispose();
   }
 
-  void _fazerLogin() {
+  void _salvarPerfil() {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      final erro = authProvider.login(
+      final erro = authProvider.atualizarPerfil(
+        nome: _nomeController.text.trim(),
         email: _emailController.text.trim(),
         senha: _senhaController.text,
       );
@@ -36,7 +54,13 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(content: Text(erro), backgroundColor: AppColors.vermelho),
         );
       } else {
-        Navigator.pushReplacementNamed(context, '/home');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Perfil atualizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
       }
     }
   }
@@ -44,38 +68,70 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.branco,
+      appBar: AppBar(
+        title: const Text(
+          'Meu Perfil',
+          style: TextStyle(color: AppColors.branco, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: AppColors.preto,
+        iconTheme: const IconThemeData(color: AppColors.branco),
+        actions: [
+          TextButton(
+            onPressed: _salvarPerfil,
+            child: const Text(
+              'Salvar',
+              style: TextStyle(
+                color: AppColors.dourado,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo / Título
-                const Icon(
-                  Icons.restaurant_menu,
-                  size: 80,
-                  color: AppColors.vermelho,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'UniReceitas',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.preto,
+                // Avatar
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: AppColors.douradoClaro,
+                  child: const Icon(
+                    Icons.person,
+                    size: 60,
+                    color: AppColors.dourado,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Faça login para continuar',
-                  style: TextStyle(fontSize: 16, color: AppColors.cinza),
-                ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
 
-                // Campo Email
+                // Nome
+                TextFormField(
+                  controller: _nomeController,
+                  decoration: InputDecoration(
+                    labelText: 'Nome',
+                    prefixIcon: const Icon(Icons.person, color: AppColors.dourado),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.dourado, width: 2),
+                    ),
+                  ),
+                  validator: (valor) {
+                    if (valor == null || valor.trim().isEmpty) {
+                      return 'Informe o nome';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Email
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -99,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Campo Senha
+                // Senha
                 TextFormField(
                   controller: _senhaController,
                   obscureText: !_senhaVisivel,
@@ -127,71 +183,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (valor == null || valor.isEmpty) {
                       return 'Informe a senha';
                     }
+                    if (valor.length < 6) {
+                      return 'A senha deve ter pelo menos 6 caracteres';
+                    }
                     return null;
                   },
-                ),
-                const SizedBox(height: 8),
-
-                // Link esqueci minha senha
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/esqueci-senha');
-                    },
-                    child: const Text(
-                      'Esqueci minha senha',
-                      style: TextStyle(color: AppColors.vermelho),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Botão Login
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: _fazerLogin,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.vermelho,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Entrar',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.branco,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Link para cadastro
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Não tem uma conta? ',
-                      style: TextStyle(color: AppColors.cinza),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/cadastro-usuario');
-                      },
-                      child: const Text(
-                        'Cadastre-se',
-                        style: TextStyle(
-                          color: AppColors.vermelho,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

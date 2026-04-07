@@ -3,32 +3,32 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_colors.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class EsqueciSenhaScreen extends StatefulWidget {
+  const EsqueciSenhaScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<EsqueciSenhaScreen> createState() => _EsqueciSenhaScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _EsqueciSenhaScreenState extends State<EsqueciSenhaScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _senhaController = TextEditingController();
+  final _novaSenhaController = TextEditingController();
   bool _senhaVisivel = false;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _senhaController.dispose();
+    _novaSenhaController.dispose();
     super.dispose();
   }
 
-  void _fazerLogin() {
+  void _redefinirSenha() {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      final erro = authProvider.login(
+      final erro = authProvider.redefinirSenha(
         email: _emailController.text.trim(),
-        senha: _senhaController.text,
+        novaSenha: _novaSenhaController.text,
       );
 
       if (erro != null) {
@@ -36,7 +36,13 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(content: Text(erro), backgroundColor: AppColors.vermelho),
         );
       } else {
-        Navigator.pushReplacementNamed(context, '/home');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Senha redefinida com sucesso! Faça login.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
       }
     }
   }
@@ -45,37 +51,44 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.branco,
+      appBar: AppBar(
+        title: const Text(
+          'Redefinir Senha',
+          style: TextStyle(color: AppColors.branco, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: AppColors.preto,
+        iconTheme: const IconThemeData(color: AppColors.branco),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo / Título
                 const Icon(
-                  Icons.restaurant_menu,
-                  size: 80,
+                  Icons.lock_reset,
+                  size: 60,
                   color: AppColors.vermelho,
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'UniReceitas',
+                  'Esqueci minha senha',
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: AppColors.preto,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Faça login para continuar',
-                  style: TextStyle(fontSize: 16, color: AppColors.cinza),
+                  'Informe seu email e a nova senha desejada.',
+                  style: TextStyle(fontSize: 14, color: AppColors.cinza),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
 
-                // Campo Email
+                // Email
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -99,12 +112,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Campo Senha
+                // Nova Senha
                 TextFormField(
-                  controller: _senhaController,
+                  controller: _novaSenhaController,
                   obscureText: !_senhaVisivel,
                   decoration: InputDecoration(
-                    labelText: 'Senha',
+                    labelText: 'Nova Senha',
                     prefixIcon: const Icon(Icons.lock, color: AppColors.dourado),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -125,34 +138,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   validator: (valor) {
                     if (valor == null || valor.isEmpty) {
-                      return 'Informe a senha';
+                      return 'Informe a nova senha';
+                    }
+                    if (valor.length < 6) {
+                      return 'A senha deve ter pelo menos 6 caracteres';
                     }
                     return null;
                   },
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 32),
 
-                // Link esqueci minha senha
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/esqueci-senha');
-                    },
-                    child: const Text(
-                      'Esqueci minha senha',
-                      style: TextStyle(color: AppColors.vermelho),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Botão Login
+                // Botão Redefinir
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _fazerLogin,
+                    onPressed: _redefinirSenha,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.vermelho,
                       shape: RoundedRectangleBorder(
@@ -160,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     child: const Text(
-                      'Entrar',
+                      'Redefinir Senha',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -168,30 +169,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                // Link para cadastro
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Não tem uma conta? ',
-                      style: TextStyle(color: AppColors.cinza),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/cadastro-usuario');
-                      },
-                      child: const Text(
-                        'Cadastre-se',
-                        style: TextStyle(
-                          color: AppColors.vermelho,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
 
-/// Provider responsável por gerenciar autenticação e usuários.
-class AuthProvider extends ChangeNotifier {
 
+class AuthProvider extends ChangeNotifier {
+  
   final List<Usuario> _usuarios = [];
 
   Usuario? _usuarioLogado;
@@ -17,6 +17,7 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String senha,
   }) {
+    // Verifica se já existe um usuário com o mesmo email
     final existente = _usuarios.any(
       (u) => u.email.toLowerCase() == email.toLowerCase(),
     );
@@ -30,6 +31,7 @@ class AuthProvider extends ChangeNotifier {
     return null;
   }
 
+  /// Realiza o login. Retorna mensagem de erro ou null se sucesso.
   String? login({required String email, required String senha}) {
     try {
       final usuario = _usuarios.firstWhere(
@@ -55,6 +57,7 @@ class AuthProvider extends ChangeNotifier {
   }) {
     if (_usuarioLogado == null) return 'Nenhum usuário logado.';
 
+    // Verifica se o email já é usado por outro usuário
     final emailEmUso = _usuarios.any(
       (u) =>
           u.id != _usuarioLogado!.id &&
