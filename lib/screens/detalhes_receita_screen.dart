@@ -266,7 +266,8 @@ class DetalhesReceitaScreen extends StatelessWidget {
               onPressed: () {
                 provider.excluirReceita(receitaId);
                 Navigator.of(dialogContext).pop();
-                Navigator.of(context).pop();
+                // Navigator.of(context, rootNavigator: true).pop();
+                Navigator.pushNamed(context, "/home");
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.vermelho,
