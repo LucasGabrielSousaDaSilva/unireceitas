@@ -63,7 +63,7 @@ class _CadastroReceitaScreenState extends State<CadastroReceitaScreen> {
     });
   }
 
-  void _salvarReceita() {
+  Future<void> _salvarReceita() async {
     if (_formKey.currentState!.validate()) {
       final usuario = context.read<AuthProvider>().usuarioLogado;
       if (usuario == null) return;
@@ -77,8 +77,9 @@ class _CadastroReceitaScreenState extends State<CadastroReceitaScreen> {
         proprietarioId: usuario.id,
       );
 
-      context.read<ReceitaProvider>().adicionarReceita(novaReceita);
+      await context.read<ReceitaProvider>().adicionarReceita(novaReceita);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Receita cadastrada com sucesso!'),

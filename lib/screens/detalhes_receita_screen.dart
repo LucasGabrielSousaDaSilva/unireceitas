@@ -6,6 +6,9 @@ import '../utils/app_colors.dart';
 import '../widgets/carrossel_imagens.dart';
 import '../models/receita.dart';
 
+/// Tela de detalhes da receita.
+/// Exibe todas as informações da receita selecionada.
+/// Botões de edição e exclusão só aparecem para o proprietário.
 class DetalhesReceitaScreen extends StatelessWidget {
   const DetalhesReceitaScreen({super.key});
 
@@ -19,9 +22,6 @@ class DetalhesReceitaScreen extends StatelessWidget {
         final receita = provider.buscarPorId(receitaId);
 
         if (receita == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(context).pop();
-          });
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -263,11 +263,12 @@ class DetalhesReceitaScreen extends StatelessWidget {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
-                provider.excluirReceita(receitaId);
-                Navigator.of(dialogContext).pop();
-                // Navigator.of(context, rootNavigator: true).pop();
-                Navigator.pushNamed(context, "/home");
+              onPressed: () async {
+                final dialogNav = Navigator.of(dialogContext);
+                final mainNav = Navigator.of(context);
+                dialogNav.pop();
+                mainNav.pop();
+                await provider.excluirReceita(receitaId);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.vermelho,

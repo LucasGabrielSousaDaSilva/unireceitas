@@ -26,15 +26,16 @@ class _CadastroUsuarioScreenState extends State<CadastroUsuarioScreen> {
     super.dispose();
   }
 
-  void _cadastrar() {
+  Future<void> _cadastrar() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      final erro = authProvider.cadastrarUsuario(
+      final erro = await authProvider.cadastrarUsuario(
         nome: _nomeController.text.trim(),
         email: _emailController.text.trim(),
         senha: _senhaController.text,
       );
 
+      if (!mounted) return;
       if (erro != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(erro), backgroundColor: AppColors.vermelho),
