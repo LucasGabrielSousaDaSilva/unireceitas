@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_colors.dart';
 
+/// Tela de perfil do usuário.
+/// Permite editar nome, email e senha.
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
 
@@ -40,15 +42,16 @@ class _PerfilScreenState extends State<PerfilScreen> {
     super.dispose();
   }
 
-  void _salvarPerfil() {
+  Future<void> _salvarPerfil() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      final erro = authProvider.atualizarPerfil(
+      final erro = await authProvider.atualizarPerfil(
         nome: _nomeController.text.trim(),
         email: _emailController.text.trim(),
         senha: _senhaController.text,
       );
 
+      if (!mounted) return;
       if (erro != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(erro), backgroundColor: AppColors.vermelho),

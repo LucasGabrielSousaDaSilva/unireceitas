@@ -6,6 +6,7 @@ import '../models/receita.dart';
 import '../providers/receita_provider.dart';
 import '../utils/app_colors.dart';
 
+/// Tela de edição de receita.
 class EditarReceitaScreen extends StatefulWidget {
   const EditarReceitaScreen({super.key});
 
@@ -86,7 +87,7 @@ class _EditarReceitaScreenState extends State<EditarReceitaScreen> {
     });
   }
 
-  void _salvarEdicao() {
+  Future<void> _salvarEdicao() async {
     if (_formKey.currentState!.validate()) {
       final provider = context.read<ReceitaProvider>();
       final receitaExistente = provider.buscarPorId(_receitaId);
@@ -100,8 +101,9 @@ class _EditarReceitaScreenState extends State<EditarReceitaScreen> {
           acesso: _acesso,
         );
 
-        provider.editarReceita(receitaEditada);
+        await provider.editarReceita(receitaEditada);
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Receita atualizada com sucesso!'),

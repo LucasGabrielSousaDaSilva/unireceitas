@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_colors.dart';
 
+/// Tela de redefinição de senha.
+/// O usuário digita o email e a nova senha.
 class EsqueciSenhaScreen extends StatefulWidget {
   const EsqueciSenhaScreen({super.key});
 
@@ -23,14 +25,15 @@ class _EsqueciSenhaScreenState extends State<EsqueciSenhaScreen> {
     super.dispose();
   }
 
-  void _redefinirSenha() {
+  Future<void> _redefinirSenha() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      final erro = authProvider.redefinirSenha(
+      final erro = await authProvider.redefinirSenha(
         email: _emailController.text.trim(),
         novaSenha: _novaSenhaController.text,
       );
 
+      if (!mounted) return;
       if (erro != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(erro), backgroundColor: AppColors.vermelho),

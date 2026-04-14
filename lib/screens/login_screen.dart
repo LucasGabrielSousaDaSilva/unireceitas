@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../utils/app_colors.dart';
 
+/// Tela de login do aplicativo.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -23,14 +24,15 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _fazerLogin() {
+  Future<void> _fazerLogin() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      final erro = authProvider.login(
+      final erro = await authProvider.login(
         email: _emailController.text.trim(),
         senha: _senhaController.text,
       );
 
+      if (!mounted) return;
       if (erro != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(erro), backgroundColor: AppColors.vermelho),
