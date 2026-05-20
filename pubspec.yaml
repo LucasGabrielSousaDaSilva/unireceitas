@@ -48,6 +48,22 @@ dependencies:
   path_provider: ^2.1.5
   path: ^1.9.1
 
+  # Supabase para persistência remota (autenticação + banco de dados)
+  supabase_flutter: ^2.12.4
+  
+  # HTTP para requisições a APIs
+  http: ^1.1.0
+
+  # Google APIs (Calendário)
+  googleapis: ^12.0.0
+  googleapis_auth: ^1.4.1
+
+  # Google Generative AI (Gemini)
+  google_generative_ai: ^0.4.4
+
+  # Tratamento de erros e logging
+  connectivity_plus: ^5.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

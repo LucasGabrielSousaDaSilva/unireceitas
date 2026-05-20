@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
-import '../database/database_helper.dart';
+import '../services/auth_service.dart';
 
-/// Provider responsável por gerenciar autenticação e usuários.
+/// AuthProvider (Controller) - Gerencia o estado de autenticação
+/// Usa AuthService para lógica de negócio
 class AuthProvider extends ChangeNotifier {
-  final DatabaseHelper _db = DatabaseHelper.instance;
-
-  /// Lista de usuários cadastrados (fonte primária em memória)
-  final List<Usuario> _usuarios = [];
+  final AuthService _authService = AuthService();
 
   /// Usuário atualmente logado
   Usuario? _usuarioLogado;
@@ -18,42 +16,46 @@ class AuthProvider extends ChangeNotifier {
   /// Verifica se há um usuário logado
   bool get estaLogado => _usuarioLogado != null;
 
-  /// Cadastra um novo usuário. Retorna mensagem de erro ou null se sucesso.
+  /// Inicializa o provider
+  Future<void> inicializar() async {
+    try {
+      await _authService.inicializar();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Erro ao inicializar AuthProvider: $e');
+    }
+  }
+
+  /// Cadastra um novo usuário
   Future<String?> cadastrarUsuario({
     required String nome,
     required String email,
     required String senha,
   }) async {
-    // Verifica se já existe um usuário com o mesmo email
-    final existente = _usuarios.any(
-      (u) => u.email.toLowerCase() == email.toLowerCase(),
-    );
-    if (existente) {
-      return 'Já existe um usuário com este email.';
-    }
-
-    final novoUsuario = Usuario(nome: nome, email: email, senha: senha);
-    _usuarios.add(novoUsuario);
-    notifyListeners();
-
     try {
-      await _db.insertUsuario(novoUsuario);
-    } catch (_) {}
-
-    return null;
-  }
-
-  /// Realiza o login. Retorna mensagem de erro ou null se sucesso.
-  Future<String?> login({required String email, required String senha}) async {
-    try {
-      final usuario = _usuarios.firstWhere(
-        (u) => u.email.toLowerCase() == email.toLowerCase() && u.senha == senha,
+      await _authService.cadastrarUsuario(
+        nome: nome,
+        email: email,
+        senha: senha,
       );
-      _usuarioLogado = usuario;
       notifyListeners();
       return null;
     } catch (e) {
-      return 'Email ou senha incorretos.';
+      return e.toString().replaceAll('Exception: ', '');
+    }
+  }
+
+  /// Realiza o login
+  Future<String?> login({required String email, required String senha}) async {
+    try {
+      _usuarioLogado = _authService.buscarUsuarioPorCredenciais(email, senha);
+      if (_usuarioLogado == null) {
+        return 'Email ou senha incorretos.';
+      }
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return 'Erro ao fazer login: ${e.toString()}';
     }
   }
 
@@ -63,8 +65,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Atualiza os dados do perfil do usuário logado.
-  /// Retorna mensagem de erro ou null se sucesso.
+  /// Atualiza os dados do perfil do usuário logado
   Future<String?> atualizarPerfil({
     required String nome,
     required String email,
@@ -72,53 +73,46 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     if (_usuarioLogado == null) return 'Nenhum usuário logado.';
 
-    // Verifica se o email já é usado por outro usuário
-    final emailEmUso = _usuarios.any(
-      (u) =>
-          u.id != _usuarioLogado!.id &&
-          u.email.toLowerCase() == email.toLowerCase(),
-    );
-    if (emailEmUso) {
-      return 'Este email já está em uso por outro usuário.';
-    }
-
-    _usuarioLogado!.nome = nome;
-    _usuarioLogado!.email = email;
-    _usuarioLogado!.senha = senha;
-    notifyListeners();
-
     try {
-      await _db.updateUsuario(_usuarioLogado!);
-    } catch (_) {}
-
-    return null;
-  }
-
-  /// Redefine a senha de um usuário pelo email.
-  /// Retorna mensagem de erro ou null se sucesso.
-  Future<String?> redefinirSenha({required String email, required String novaSenha}) async {
-    try {
-      final usuario = _usuarios.firstWhere(
-        (u) => u.email.toLowerCase() == email.toLowerCase(),
+      _usuarioLogado = await _authService.atualizarUsuario(
+        usuarioId: _usuarioLogado!.id,
+        nome: nome,
+        email: email,
+        senha: senha,
       );
-      usuario.senha = novaSenha;
       notifyListeners();
-
-      try {
-        await _db.updateUsuario(usuario);
-      } catch (_) {}
-
       return null;
     } catch (e) {
-      return 'Nenhum usuário encontrado com este email.';
+      return e.toString().replaceAll('Exception: ', '');
     }
   }
 
-  /// Carrega usuários do banco de dados para a lista em memória.
+  /// Redefine a senha de um usuário pelo email
+  Future<String?> redefinirSenha({
+    required String email,
+    required String novaSenha,
+  }) async {
+    try {
+      await _authService.redefinirSenha(email: email, novaSenha: novaSenha);
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString().replaceAll('Exception: ', '');
+    }
+  }
+
+  /// Obtém todos os usuários
+  List<Usuario> obterTodosUsuarios() {
+    return _authService.obterTodosUsuarios();
+  }
+
+  /// Carrega usuários do banco de dados
   Future<void> carregarUsuarios() async {
     try {
-      final usuarios = await _db.getUsuarios();
-      _usuarios.addAll(usuarios);
-    } catch (_) {}
+      await _authService.inicializar();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Erro ao carregar usuários: $e');
+    }
   }
 }

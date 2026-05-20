@@ -16,6 +16,8 @@ class AppColors {
 
   static const Color douradoClaro = Color(0xFFF5E6B8);
 
+  static const Color verde = Color(0xFF4CAF50);
+
   static const Color cinzaClaro = Color(0xFFF5F5F5);
 
   static const Color cinza = Color(0xFF757575);

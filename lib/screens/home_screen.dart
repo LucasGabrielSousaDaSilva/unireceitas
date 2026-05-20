@@ -64,6 +64,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         centerTitle: true,
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome, color: AppColors.branco, size: 28),
+            tooltip: 'Recursos',
+            onPressed: () => Navigator.pushNamed(context, '/recursos'),
+          ),
           // Dropdown com opções de perfil e logout
           PopupMenuButton<String>(
             icon: const Icon(Icons.account_circle, color: AppColors.branco, size: 30),

@@ -7,6 +7,9 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'database/database_helper.dart';
 import 'providers/auth_provider.dart';
 import 'providers/receita_provider.dart';
+import 'providers/ai_provider.dart';
+import 'providers/nutrition_provider.dart';
+import 'providers/calendar_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/cadastro_usuario_screen.dart';
 import 'screens/esqueci_senha_screen.dart';
@@ -15,7 +18,11 @@ import 'screens/perfil_screen.dart';
 import 'screens/detalhes_receita_screen.dart';
 import 'screens/cadastro_receita_screen.dart';
 import 'screens/editar_receita_screen.dart';
+import 'screens/recursos_screen.dart';
+//import 'services/supabase_service.dart';
+//import 'services/sync_service.dart';
 import 'utils/app_colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,20 +40,34 @@ void main() async {
 
   try {
     await DatabaseHelper.instance.database;
-    await authProvider.carregarUsuarios();
-    await receitaProvider.carregarReceitas();
+    await authProvider.inicializar();
+    await receitaProvider.inicializar();
   } catch (e) {
-    debugPrint('Erro ao inicializar banco de dados: $e');
+    debugPrint('Erro ao inicializar aplicativo: $e');
   }
 
-  runApp(UniReceitasApp(authProvider: authProvider, receitaProvider: receitaProvider));
+  await Supabase.initialize(
+    url: 'https://kngdraibfylpszglknks.supabase.co',
+    anonKey: 'sb_publishable_STKWVzE6_DyZVjQIZ3PKfw_Paf62nw-',
+  );
+
+  runApp(
+    UniReceitasApp(
+      authProvider: authProvider,
+      receitaProvider: receitaProvider,
+    ),
+  );
 }
 
 class UniReceitasApp extends StatelessWidget {
   final AuthProvider authProvider;
   final ReceitaProvider receitaProvider;
 
-  const UniReceitasApp({super.key, required this.authProvider, required this.receitaProvider});
+  const UniReceitasApp({
+    super.key,
+    required this.authProvider,
+    required this.receitaProvider,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +75,9 @@ class UniReceitasApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: authProvider),
         ChangeNotifierProvider.value(value: receitaProvider),
+        ChangeNotifierProvider(create: (_) => AIProvider()),
+        ChangeNotifierProvider(create: (_) => NutritionProvider()),
+        ChangeNotifierProvider(create: (_) => CalendarProvider()),
       ],
       child: MaterialApp(
         title: 'UniReceitas',
@@ -85,6 +109,9 @@ class UniReceitasApp extends StatelessWidget {
           '/detalhes': (context) => const DetalhesReceitaScreen(),
           '/cadastro': (context) => const CadastroReceitaScreen(),
           '/editar': (context) => const EditarReceitaScreen(),
+          '/recursos': (context) => const RecursosScreen(),
+          // '/logout': (context) => const LoginScreen(),
+          // '/calendario' : (context) => const CalendarioScreen(),
         },
       ),
     );
