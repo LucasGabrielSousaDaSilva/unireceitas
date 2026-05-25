@@ -19,8 +19,8 @@ import 'screens/detalhes_receita_screen.dart';
 import 'screens/cadastro_receita_screen.dart';
 import 'screens/editar_receita_screen.dart';
 import 'screens/recursos_screen.dart';
-//import 'services/supabase_service.dart';
-//import 'services/sync_service.dart';
+import 'services/supabase_service.dart';
+import 'services/sync_service.dart';
 import 'utils/app_colors.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -42,14 +42,13 @@ void main() async {
     await DatabaseHelper.instance.database;
     await authProvider.inicializar();
     await receitaProvider.inicializar();
-  } catch (e) {
-    debugPrint('Erro ao inicializar aplicativo: $e');
-  }
-
-  await Supabase.initialize(
+    await Supabase.initialize(
     url: 'https://kngdraibfylpszglknks.supabase.co',
     anonKey: 'sb_publishable_STKWVzE6_DyZVjQIZ3PKfw_Paf62nw-',
   );
+  } catch (e) {
+    debugPrint('Erro ao inicializar aplicativo: $e');
+  }
 
   runApp(
     UniReceitasApp(
@@ -110,8 +109,6 @@ class UniReceitasApp extends StatelessWidget {
           '/cadastro': (context) => const CadastroReceitaScreen(),
           '/editar': (context) => const EditarReceitaScreen(),
           '/recursos': (context) => const RecursosScreen(),
-          // '/logout': (context) => const LoginScreen(),
-          // '/calendario' : (context) => const CalendarioScreen(),
         },
       ),
     );
