@@ -111,6 +111,43 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Altera a senha do usuário logado.
+  /// Requer a senha atual para confirmação.
+  Future<String?> alterarSenha({
+    required String senhaAtual,
+    required String novaSenha,
+  }) async {
+    if (_usuarioLogado == null) return 'Nenhum usuário logado.';
+    try {
+      await _authService.alterarSenha(
+        email: _usuarioLogado!.email,
+        senhaAtual: senhaAtual,
+        novaSenha: novaSenha,
+      );
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString().replaceAll('Exception: ', '');
+    }
+  }
+
+  /// Exclui a conta do usuário logado (dados e receitas) após confirmar a senha.
+  Future<String?> excluirConta({required String senha}) async {
+    if (_usuarioLogado == null) return 'Nenhum usuário logado.';
+    try {
+      await _authService.excluirConta(
+        usuarioId: _usuarioLogado!.id,
+        email: _usuarioLogado!.email,
+        senhaConfirmacao: senha,
+      );
+      _usuarioLogado = null;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString().replaceAll('Exception: ', '');
+    }
+  }
+
   /// Obtém todos os usuários
   List<Usuario> obterTodosUsuarios() {
     return _authService.obterTodosUsuarios();

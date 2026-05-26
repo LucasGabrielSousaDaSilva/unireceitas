@@ -152,6 +152,65 @@ class AuthService {
     await _supabase.atualizarSenha(novaSenha);
   }
 
+  /// Altera a senha do usuário autenticado.
+  /// Verifica a senha atual reautenticando no Supabase Auth antes de aplicar
+  /// a nova senha.
+  Future<void> alterarSenha({
+    required String email,
+    required String senhaAtual,
+    required String novaSenha,
+  }) async {
+    try {
+      final authUser =
+          await _supabase.autenticar(email: email, senha: senhaAtual);
+      if (authUser == null) {
+        throw Exception('Senha atual incorreta.');
+      }
+    } catch (e) {
+      throw Exception('Senha atual incorreta.');
+    }
+
+    try {
+      await _supabase.atualizarSenha(novaSenha);
+    } catch (e) {
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
+    }
+
+    final idx = _usuarios.indexWhere(
+      (u) => u.email.toLowerCase() == email.toLowerCase(),
+    );
+    if (idx >= 0) {
+      _usuarios[idx].senha = novaSenha;
+    }
+  }
+
+  /// Exclui a conta do usuário (dados, receitas e sessão).
+  /// Valida a senha informada antes de excluir.
+  Future<void> excluirConta({
+    required String usuarioId,
+    required String email,
+    required String senhaConfirmacao,
+  }) async {
+    try {
+      final authUser = await _supabase.autenticar(
+        email: email,
+        senha: senhaConfirmacao,
+      );
+      if (authUser == null) {
+        throw Exception('Senha incorreta.');
+      }
+    } catch (e) {
+      throw Exception('Senha incorreta.');
+    }
+
+    try {
+      await _supabase.deletarUsuarioCompleto(usuarioId);
+      _usuarios.removeWhere((u) => u.id == usuarioId);
+    } catch (e) {
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
   /// Obtém todos os usuários
   List<Usuario> obterTodosUsuarios() {
     return List.unmodifiable(_usuarios);

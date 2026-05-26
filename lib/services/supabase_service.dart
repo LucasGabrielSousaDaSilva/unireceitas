@@ -188,6 +188,30 @@ class SupabaseService {
     }
   }
 
+  /// Exclui a conta completa de um usuário:
+  /// remove todas as receitas, o registro do usuário e encerra a sessão.
+  Future<void> deletarUsuarioCompleto(String usuarioId) async {
+    try {
+      await _usuario
+          .from(SupabaseConfig.receitasTable)
+          .delete()
+          .eq('proprietario_id', usuarioId);
+
+      await _usuario
+          .from(SupabaseConfig.usuariosTable)
+          .delete()
+          .eq('id', usuarioId);
+
+      try {
+        await _usuario.auth.signOut();
+      } catch (_) {
+        // Sessão pode já estar encerrada; ignora.
+      }
+    } catch (e) {
+      throw Exception('Erro ao excluir conta: $e');
+    }
+  }
+
   // ===================== OPERAÇÕES DE RECEITAS =====================
 
   /// Cria uma nova receita
