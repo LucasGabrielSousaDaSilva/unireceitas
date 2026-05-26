@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -13,13 +14,13 @@ import 'providers/calendar_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/cadastro_usuario_screen.dart';
 import 'screens/esqueci_senha_screen.dart';
+import 'screens/redefinir_senha_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/perfil_screen.dart';
 import 'screens/detalhes_receita_screen.dart';
 import 'screens/cadastro_receita_screen.dart';
 import 'screens/editar_receita_screen.dart';
 import 'screens/recursos_screen.dart';
-import 'services/supabase_service.dart';
 import 'services/sync_service.dart';
 import 'utils/app_colors.dart';
 import 'config/supabase_config.dart';
@@ -60,7 +61,7 @@ void main() async {
   );
 }
 
-class UniReceitasApp extends StatelessWidget {
+class UniReceitasApp extends StatefulWidget {
   final AuthProvider authProvider;
   final ReceitaProvider receitaProvider;
 
@@ -71,17 +72,55 @@ class UniReceitasApp extends StatelessWidget {
   });
 
   @override
+  State<UniReceitasApp> createState() => _UniReceitasAppState();
+}
+
+class _UniReceitasAppState extends State<UniReceitasApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Escuta o fluxo oficial de recuperação de senha do Supabase.
+    // Quando o usuário abre o deep link recebido por e-mail, o SDK
+    // emite o evento [AuthChangeEvent.passwordRecovery] com uma sessão
+    // temporária que autoriza a troca de senha.
+    try {
+      _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(
+        (data) {
+          if (data.event == AuthChangeEvent.passwordRecovery) {
+            _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+              '/redefinir-senha',
+              (_) => false,
+            );
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint('Falha ao registrar listener de auth do Supabase: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider.value(value: authProvider),
-        ChangeNotifierProvider.value(value: receitaProvider),
+        ChangeNotifierProvider.value(value: widget.authProvider),
+        ChangeNotifierProvider.value(value: widget.receitaProvider),
         ChangeNotifierProvider(create: (_) => AIProvider()),
         ChangeNotifierProvider(create: (_) => NutritionProvider()),
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
       ],
       child: MaterialApp(
         title: 'UniReceitas',
+        navigatorKey: _navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           primaryColor: AppColors.vermelho,
@@ -105,6 +144,7 @@ class UniReceitasApp extends StatelessWidget {
           '/': (context) => const LoginScreen(),
           '/cadastro-usuario': (context) => const CadastroUsuarioScreen(),
           '/esqueci-senha': (context) => const EsqueciSenhaScreen(),
+          '/redefinir-senha': (context) => const RedefinirSenhaScreen(),
           '/home': (context) => const HomeScreen(),
           '/perfil': (context) => const PerfilScreen(),
           '/detalhes': (context) => const DetalhesReceitaScreen(),

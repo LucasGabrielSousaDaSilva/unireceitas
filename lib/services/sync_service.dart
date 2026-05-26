@@ -72,27 +72,77 @@ class SyncService {
     }
   }
 
-  /// Sincroniza usuários
+  /// Valida formato de email (evita enviar emails inválidos para o Supabase Auth)
+  bool _emailValido(String email) {
+    final regex = RegExp(r'^[\w\.\-+]+@[\w\-]+\.[\w\-\.]+$');
+    return email.isNotEmpty && regex.hasMatch(email);
+  }
+
+  /// Sincroniza usuários (bidirecional)
   Future<void> _sincronizarUsuarios() async {
     try {
       final usuariosLocais = await _localDb.getUsuarios();
       final usuariosRemoto = await _remoteDb.obterUsuarios();
 
-      // Envia usuários novos para o servidor
+      // Puxa usuários remotos para o banco local (necessário para FK de receitas)
+      for (final remoto in usuariosRemoto) {
+        if (remoto.id.isEmpty) continue;
+        final existeLocal =
+            usuariosLocais.any((u) => u.id == remoto.id);
+        if (!existeLocal) {
+          await _localDb.insertUsuario(remoto);
+        }
+      }
+
+      // Envia usuários novos para o servidor (pulando emails inválidos)
       for (final usuario in usuariosLocais) {
+        if (!_emailValido(usuario.email)) {
+          // ignore: avoid_print
+          print('Pulando sync de usuário com email inválido: "${usuario.email}"');
+          continue;
+        }
         final existe = usuariosRemoto.any((u) => u.email == usuario.email);
         if (!existe) {
-          await _remoteDb.criarUsuario(
-            nome: usuario.nome,
-            email: usuario.email,
-            senha: usuario.senha,
-          );
+          try {
+            await _remoteDb.criarUsuario(
+              nome: usuario.nome,
+              email: usuario.email,
+              senha: usuario.senha,
+            );
+          } catch (e) {
+            // ignore: avoid_print
+            print('Falha ao enviar usuário ${usuario.email} ao remoto: $e');
+          }
         }
       }
     } catch (e) {
       // ignore: avoid_print
       print('Erro ao sincronizar usuários: $e');
     }
+  }
+
+  /// Garante que o proprietário de uma receita exista localmente antes
+  /// de salvar a receita (evita falha de FOREIGN KEY).
+  Future<bool> _garantirProprietarioLocal(String proprietarioId) async {
+    if (proprietarioId.isEmpty) return false;
+    final existente = await _localDb.getUsuarioById(proprietarioId);
+    if (existente != null) return true;
+
+    try {
+      final remotos = await _remoteDb.obterUsuarios();
+      final dono = remotos.firstWhere(
+        (u) => u.id == proprietarioId,
+        orElse: () => Usuario(id: '', nome: '', email: '', senha: ''),
+      );
+      if (dono.id.isNotEmpty) {
+        await _localDb.insertUsuario(dono);
+        return true;
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('Falha ao buscar proprietário remoto $proprietarioId: $e');
+    }
+    return false;
   }
 
   /// Sincroniza receitas
@@ -121,8 +171,19 @@ class SyncService {
       // Adiciona localmente receitas do servidor que ainda não estão no banco local
       for (final receita in receitasRemoto) {
         final existe = receitasLocais.any((r) => r.id == receita.id);
-        if (!existe) {
+        if (existe) continue;
+        final donoOk = await _garantirProprietarioLocal(receita.proprietarioId);
+        if (!donoOk) {
+          // ignore: avoid_print
+          print(
+              'Pulando receita ${receita.id} (${receita.nome}): proprietário ${receita.proprietarioId} não existe localmente.');
+          continue;
+        }
+        try {
           await _localDb.insertReceita(receita);
+        } catch (e) {
+          // ignore: avoid_print
+          print('Falha ao inserir receita ${receita.id} localmente: $e');
         }
       }
     } catch (e) {
@@ -192,9 +253,26 @@ class SyncService {
         for (final remoto in receitasRemoto) {
           final existe = receitasLocais.any((local) => local.id == remoto.id);
           if (existe) {
-            await _localDb.updateReceita(remoto);
-          } else {
+            try {
+              await _localDb.updateReceita(remoto);
+            } catch (e) {
+              // ignore: avoid_print
+              print('Falha ao atualizar receita ${remoto.id} localmente: $e');
+            }
+            continue;
+          }
+          final donoOk = await _garantirProprietarioLocal(remoto.proprietarioId);
+          if (!donoOk) {
+            // ignore: avoid_print
+            print(
+                'Pulando receita ${remoto.id} (${remoto.nome}): proprietário ${remoto.proprietarioId} não existe localmente.');
+            continue;
+          }
+          try {
             await _localDb.insertReceita(remoto);
+          } catch (e) {
+            // ignore: avoid_print
+            print('Falha ao inserir receita ${remoto.id} localmente: $e');
           }
         }
         return await _localDb.getReceitas();

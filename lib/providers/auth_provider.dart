@@ -87,13 +87,23 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Redefine a senha de um usuário pelo email
-  Future<String?> redefinirSenha({
-    required String email,
-    required String novaSenha,
-  }) async {
+  /// Envia o e-mail de recuperação de senha via Supabase Auth.
+  /// Retorna `null` em sucesso ou a mensagem de erro.
+  Future<String?> enviarEmailRecuperacao(String email) async {
     try {
-      await _authService.redefinirSenha(email: email, novaSenha: novaSenha);
+      await _authService.enviarEmailRecuperacao(email);
+      return null;
+    } catch (e) {
+      return e.toString().replaceAll('Exception: ', '');
+    }
+  }
+
+  /// Redefine a senha do usuário autenticado pela sessão de recuperação
+  /// estabelecida pelo deep link recebido por e-mail.
+  /// Retorna `null` em sucesso ou a mensagem de erro.
+  Future<String?> redefinirSenhaAutenticada(String novaSenha) async {
+    try {
+      await _authService.redefinirSenhaAutenticada(novaSenha);
       notifyListeners();
       return null;
     } catch (e) {

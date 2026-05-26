@@ -1,12 +1,14 @@
 import '../models/usuario.dart';
 import '../database/database_helper.dart';
 import '../services/sync_service.dart';
+import '../services/supabase_service.dart';
 
 /// AuthService - Camada de Serviço de Autenticação
 /// Responsável pela lógica de negócio de autenticação e gerenciamento de usuários
 class AuthService {
   final DatabaseHelper _db = DatabaseHelper.instance;
   final SyncService _sync = SyncService.instance;
+  final SupabaseService _supabase = SupabaseService();
   final List<Usuario> _usuarios = [];
 
   /// Carrega usuários do banco de dados
@@ -109,20 +111,29 @@ class AuthService {
     return usuarioAtualizado;
   }
 
-  /// Redefine a senha de um usuário
-  Future<void> redefinirSenha({
-    required String email,
-    required String novaSenha,
-  }) async {
-    try {
-      final usuario = _usuarios.firstWhere(
-        (u) => u.email.toLowerCase() == email.toLowerCase(),
-      );
-      usuario.senha = novaSenha;
-      await _db.updateUsuario(usuario);
-    } catch (e) {
-      throw Exception('Usuário não encontrado ou erro ao redefinir senha.');
+  /// Envia o e-mail oficial de recuperação de senha via Supabase Auth.
+  ///
+  /// Por segurança, não diferencia "usuário não existe" de "e-mail enviado":
+  /// a API do Supabase é desenhada para não permitir enumeração de usuários,
+  /// então a UI deve sempre exibir mensagem genérica de sucesso.
+  Future<void> enviarEmailRecuperacao(String email) async {
+    if (email.trim().isEmpty) {
+      throw Exception('Informe um e-mail válido.');
     }
+    await _supabase.enviarEmailRecuperacaoSenha(email.trim());
+  }
+
+  /// Atualiza a senha do usuário autenticado pela sessão de recuperação
+  /// (a sessão é estabelecida automaticamente pelo SDK quando o usuário
+  /// abre o deep link recebido por e-mail).
+  ///
+  /// Também sincroniza a senha no cache local em memória para manter
+  /// consistência com o restante do sistema.
+  Future<void> redefinirSenhaAutenticada(String novaSenha) async {
+    if (novaSenha.length < 6) {
+      throw Exception('A senha deve ter pelo menos 6 caracteres.');
+    }
+    await _supabase.atualizarSenha(novaSenha);
   }
 
   /// Obtém todos os usuários

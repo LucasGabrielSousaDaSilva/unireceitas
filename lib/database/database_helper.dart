@@ -77,7 +77,22 @@ class DatabaseHelper {
 
   Future<int> insertUsuario(Usuario usuario) async {
     final db = await database;
-    return await db.insert('usuarios', usuario.toMap());
+    return await db.insert(
+      'usuarios',
+      usuario.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Usuario?> getUsuarioById(String id) async {
+    final db = await database;
+    final maps = await db.query(
+      'usuarios',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return Usuario.fromMap(maps.first);
   }
 
   Future<List<Usuario>> getUsuarios() async {

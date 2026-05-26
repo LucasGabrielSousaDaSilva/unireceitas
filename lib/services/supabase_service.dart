@@ -138,6 +138,42 @@ class SupabaseService {
     }
   }
 
+  /// Envia o e-mail oficial de recuperação de senha do Supabase Auth.
+  ///
+  /// Não revela se o e-mail existe ou não — a própria API do Supabase
+  /// é desenhada para evitar enumeração de usuários.
+  Future<void> enviarEmailRecuperacaoSenha(String email) async {
+    try {
+      await _usuario.auth.resetPasswordForEmail(
+        email,
+        redirectTo: SupabaseConfig.passwordRecoveryRedirect,
+      );
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      throw Exception('Erro ao enviar e-mail de recuperação: $e');
+    }
+  }
+
+  /// Atualiza a senha do usuário autenticado.
+  ///
+  /// Requer uma sessão ativa — normalmente estabelecida automaticamente
+  /// pelo SDK quando o usuário abre o deep link de recuperação.
+  Future<void> atualizarSenha(String novaSenha) async {
+    try {
+      final session = _usuario.auth.currentSession;
+      if (session == null) {
+        throw Exception(
+            'Sessão de recuperação não encontrada. Abra o link enviado por e-mail novamente.');
+      }
+      await _usuario.auth.updateUser(UserAttributes(password: novaSenha));
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      throw Exception('Erro ao redefinir senha: $e');
+    }
+  }
+
   /// Faz logout do usuário
   Future<void> logout() async {
     try {

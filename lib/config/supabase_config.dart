@@ -12,6 +12,14 @@ class SupabaseConfig {
   static const String usuariosTable = 'usuarios';
   static const String receitasTable = 'receitas';
 
+  /// URL de redirect para o fluxo de recuperação de senha.
+  /// - Em mobile/desktop é tratado como deep link (precisa estar registrado
+  ///   nos esquemas nativos e como Redirect URL no painel Supabase →
+  ///   Authentication → URL Configuration).
+  /// - Em web, use a URL pública do app (ex.: https://app.unireceitas.com/reset).
+  static const String passwordRecoveryRedirect =
+      'io.supabase.unireceitas://reset-callback/';
+
   /// Valida se as credenciais foram configuradas
   static bool get isConfigured {
     return true;
