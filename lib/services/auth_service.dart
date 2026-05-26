@@ -1,20 +1,17 @@
 import '../models/usuario.dart';
-import '../database/database_helper.dart';
-import '../services/sync_service.dart';
 import '../services/supabase_service.dart';
 
 /// AuthService - Camada de Serviço de Autenticação
-/// Responsável pela lógica de negócio de autenticação e gerenciamento de usuários
+/// Responsável pela lógica de negócio de autenticação e gerenciamento de usuários.
+/// Persistência feita exclusivamente no Supabase.
 class AuthService {
-  final DatabaseHelper _db = DatabaseHelper.instance;
-  final SyncService _sync = SyncService.instance;
   final SupabaseService _supabase = SupabaseService();
   final List<Usuario> _usuarios = [];
 
-  /// Carrega usuários do banco de dados
+  /// Carrega usuários do Supabase
   Future<void> inicializar() async {
     try {
-      final usuarios = await _sync.obterUsuarios();
+      final usuarios = await _supabase.obterUsuarios();
       _usuarios.clear();
       _usuarios.addAll(usuarios);
     } catch (e) {
@@ -38,7 +35,7 @@ class AuthService {
     );
   }
 
-  /// Cadastra um novo usuário
+  /// Cadastra um novo usuário no Supabase
   Future<Usuario> cadastrarUsuario({
     required String nome,
     required String email,
@@ -52,12 +49,14 @@ class AuthService {
       throw Exception('Todos os campos são obrigatórios.');
     }
 
-    final novoUsuarioTemp = Usuario(nome: nome, email: email, senha: senha);
-
     try {
-      final novoUsuarioSalvo = await _sync.inserirUsuario(novoUsuarioTemp);
-      _usuarios.add(novoUsuarioSalvo);
-      return novoUsuarioSalvo;
+      final novoUsuario = await _supabase.criarUsuario(
+        nome: nome,
+        email: email,
+        senha: senha,
+      );
+      _usuarios.add(novoUsuario);
+      return novoUsuario;
     } catch (e) {
       throw Exception('Erro ao cadastrar usuário: $e');
     }
@@ -70,37 +69,34 @@ class AuthService {
   /// e atualiza o cache local em memória.
   Future<Usuario?> buscarUsuarioPorCredenciais(
       String email, String senha) async {
+    final authUser =
+        await _supabase.autenticar(email: email, senha: senha);
+    if (authUser == null) return null;
+
+    Usuario? usuario;
     try {
-      final authUser =
-          await _supabase.autenticar(email: email, senha: senha);
-      if (authUser == null) return null;
-
-      Usuario? usuario;
-      try {
-        usuario = await _supabase.buscarUsuarioPorEmail(email);
-      } catch (_) {
-        usuario = null;
-      }
-      usuario ??= Usuario(
-        id: authUser.id,
-        nome: authUser.email ?? email,
-        email: email,
-        senha: senha,
-      );
-
-      final idx = _usuarios.indexWhere((u) => u.id == usuario!.id);
-      if (idx >= 0) {
-        _usuarios[idx] = usuario;
-      } else {
-        _usuarios.add(usuario);
-      }
-      return usuario;
-    } catch (e) {
-      return null;
+      usuario = await _supabase.buscarUsuarioPorEmail(email);
+    } catch (_) {
+      usuario = null;
     }
+    usuario ??= Usuario(
+      id: authUser.id,
+      nome: authUser.email ?? email,
+      email: email,
+      senha: senha,
+    );
+
+    final idx = _usuarios.indexWhere((u) => u.id == usuario!.id);
+    if (idx >= 0) {
+      _usuarios[idx] = usuario;
+    } else {
+      _usuarios.add(usuario);
+    }
+
+    return usuario;
   }
 
-  /// Atualiza os dados de um usuário
+  /// Atualiza os dados de um usuário no Supabase
   Future<Usuario> atualizarUsuario({
     required String usuarioId,
     required String nome,
@@ -122,12 +118,11 @@ class AuthService {
     usuarioAtualizado.senha = senha;
 
     try {
-      // In a real scenario, SyncService would have an updateUsuario method.
-      // For now, since SyncService.inserirUsuario handles 'always save locally',
-      // we can add update logic in SyncService, or we can assume it will be synced later.
-      // But we probably need to add updateUsuario in SyncService.
-      // Wait, SyncService doesn't have atualizarUsuario for some reason. Let's look at what we can do.
-      await _db.updateUsuario(usuarioAtualizado);
+      await _supabase.atualizarUsuario(
+        usuarioId: usuarioId,
+        nome: nome,
+        email: email,
+      );
     } catch (e) {
       throw Exception('Erro ao atualizar usuário: $e');
     }
@@ -150,9 +145,6 @@ class AuthService {
   /// Atualiza a senha do usuário autenticado pela sessão de recuperação
   /// (a sessão é estabelecida automaticamente pelo SDK quando o usuário
   /// abre o deep link recebido por e-mail).
-  ///
-  /// Também sincroniza a senha no cache local em memória para manter
-  /// consistência com o restante do sistema.
   Future<void> redefinirSenhaAutenticada(String novaSenha) async {
     if (novaSenha.length < 6) {
       throw Exception('A senha deve ter pelo menos 6 caracteres.');

@@ -16,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _senhaController = TextEditingController();
   bool _senhaVisivel = false;
+  bool _carregando = false;
 
   @override
   void dispose() {
@@ -25,12 +26,21 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _fazerLogin() async {
-    if (_formKey.currentState!.validate()) {
+    debugPrint('[LOGIN] Botão Entrar clicado');
+    if (!_formKey.currentState!.validate()) {
+      debugPrint('[LOGIN] Validação do formulário falhou');
+      return;
+    }
+
+    setState(() => _carregando = true);
+    try {
       final authProvider = context.read<AuthProvider>();
+      debugPrint('[LOGIN] Chamando authProvider.login...');
       final erro = await authProvider.login(
         email: _emailController.text.trim(),
         senha: _senhaController.text,
       );
+      debugPrint('[LOGIN] authProvider.login retornou: erro=$erro');
 
       if (!mounted) return;
       if (erro != null) {
@@ -38,8 +48,21 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(content: Text(erro), backgroundColor: AppColors.vermelho),
         );
       } else {
+        debugPrint('[LOGIN] Navegando para /home');
         Navigator.pushReplacementNamed(context, '/home');
       }
+    } catch (e, st) {
+      debugPrint('[LOGIN] Exceção não tratada: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Falha inesperada: $e'),
+            backgroundColor: AppColors.vermelho,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _carregando = false);
     }
   }
 
@@ -154,21 +177,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _fazerLogin,
+                    onPressed: _carregando ? null : _fazerLogin,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.vermelho,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Entrar',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.branco,
-                      ),
-                    ),
+                    child: _carregando
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.branco,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Entrar',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.branco,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),

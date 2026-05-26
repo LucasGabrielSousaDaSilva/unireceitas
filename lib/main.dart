@@ -1,11 +1,6 @@
 import 'dart:async';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
-import 'database/database_helper.dart';
 import 'providers/auth_provider.dart';
 import 'providers/receita_provider.dart';
 import 'providers/ai_provider.dart';
@@ -21,7 +16,6 @@ import 'screens/detalhes_receita_screen.dart';
 import 'screens/cadastro_receita_screen.dart';
 import 'screens/editar_receita_screen.dart';
 import 'screens/recursos_screen.dart';
-import 'services/sync_service.dart';
 import 'utils/app_colors.dart';
 import 'config/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -29,26 +23,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializa o SQLite para cada plataforma
-  if (kIsWeb) {
-    databaseFactory = databaseFactoryFfiWeb;
-  } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
-
   final authProvider = AuthProvider();
   final receitaProvider = ReceitaProvider();
 
   try {
-    // Supabase precisa ser inicializado ANTES de qualquer serviço que
-    // dependa de `Supabase.instance.client`.
     await Supabase.initialize(
       url: SupabaseConfig.supabaseUrl,
       anonKey: SupabaseConfig.supabaseKey,
     );
-    await DatabaseHelper.instance.database;
-    await SyncService.instance.inicializar();
     await authProvider.inicializar();
     await receitaProvider.inicializar();
   } catch (e) {

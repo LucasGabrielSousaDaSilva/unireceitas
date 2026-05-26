@@ -1,16 +1,16 @@
 import '../models/receita.dart';
-import '../services/sync_service.dart';
+import '../services/supabase_service.dart';
 
 /// ReceitaService - Camada de Serviço de Receitas
-/// Responsável pela lógica de negócio de gerenciamento de receitas
+/// Persistência feita exclusivamente no Supabase.
 class ReceitaService {
-  final SyncService _sync = SyncService.instance;
+  final SupabaseService _supabase = SupabaseService();
   final List<Receita> _receitas = [];
 
-  /// Inicializa o serviço carregando receitas do banco de dados
+  /// Inicializa o serviço carregando receitas do Supabase
   Future<void> inicializar() async {
     try {
-      final receitas = await _sync.obterReceitas();
+      final receitas = await _supabase.obterReceitas();
       _receitas.clear();
       _receitas.addAll(receitas);
     } catch (e) {
@@ -81,14 +81,21 @@ class ReceitaService {
 
   /// Adiciona uma nova receita
   Future<Receita> adicionarReceita(Receita receita) async {
-    _receitas.add(receita);
     try {
-      await _sync.inserirReceita(receita);
+      final nova = await _supabase.criarReceita(
+        id: receita.id,
+        nome: receita.nome,
+        ingredientes: receita.ingredientes,
+        modopreparo: receita.modoPreparo,
+        proprietarioId: receita.proprietarioId,
+        acesso: receita.acesso,
+        imagens: receita.imagens,
+      );
+      _receitas.add(nova);
+      return nova;
     } catch (e) {
-      _receitas.remove(receita);
       throw Exception('Erro ao adicionar receita: $e');
     }
-    return receita;
   }
 
   /// Atualiza uma receita existente
@@ -98,15 +105,21 @@ class ReceitaService {
       throw Exception('Receita não encontrada.');
     }
 
-    _receitas[index] = receitaAtualizada;
     try {
-      await _sync.atualizarReceita(receitaAtualizada);
+      await _supabase.atualizarReceita(
+        receitaId: receitaAtualizada.id,
+        nome: receitaAtualizada.nome,
+        ingredientes: receitaAtualizada.ingredientes,
+        modoPreparo: receitaAtualizada.modoPreparo,
+        acesso: receitaAtualizada.acesso,
+        proprietarioId: receitaAtualizada.proprietarioId,
+        imagens: receitaAtualizada.imagens,
+      );
+      _receitas[index] = receitaAtualizada;
+      return receitaAtualizada;
     } catch (e) {
-      // Reverte a mudança em caso de erro
-      _receitas[index] = _receitas[index];
       throw Exception('Erro ao atualizar receita: $e');
     }
-    return receitaAtualizada;
   }
 
   /// Exclui uma receita
@@ -116,35 +129,13 @@ class ReceitaService {
       throw Exception('Receita não encontrada.');
     }
 
-    final receitaRemovida = _receitas.removeAt(index);
     try {
-      await _sync.deletarReceita(id);
+      await _supabase.deletarReceita(id);
+      _receitas.removeAt(index);
     } catch (e) {
-      // Reverte a remoção em caso de erro
-      _receitas.insert(index, receitaRemovida);
       throw Exception('Erro ao excluir receita: $e');
     }
   }
-
-  /// Marca uma receita como favorita
-  // Future<void> marcarFavorita(String receitaId, bool favorita) async {
-  //   final receita = buscarPorId(receitaId);
-  //   if (receita == null) {
-  //     throw Exception('Receita não encontrada.');
-  //   }
-
-  //   receita.favorita = favorita;
-  //   try {
-  //     await _db.updateReceita(receita);
-  //   } catch (e) {
-  //     throw Exception('Erro ao marcar receita como favorita: $e');
-  //   }
-  // }
-
-  /// Obtém receitas favoritas de um usuário
-  // List<Receita> obterFavoritas(String usuarioId) {
-  //   return _receitas.where((r) => r.favorita && r.proprietarioId == usuarioId).toList();
-  // }
 
   /// Altera o acesso de uma receita
   Future<void> alterarAcesso(String receitaId, AcessoReceita novoAcesso) async {
@@ -155,7 +146,14 @@ class ReceitaService {
 
     receita.acesso = novoAcesso;
     try {
-      await _sync.atualizarReceita(receita);
+      await _supabase.atualizarReceita(
+        receitaId: receita.id,
+        nome: receita.nome,
+        ingredientes: receita.ingredientes,
+        modoPreparo: receita.modoPreparo,
+        acesso: receita.acesso,
+        proprietarioId: receita.proprietarioId,
+      );
     } catch (e) {
       throw Exception('Erro ao alterar acesso da receita: $e');
     }
