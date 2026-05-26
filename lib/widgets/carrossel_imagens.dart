@@ -27,6 +27,27 @@ class _CarrosselImagensState extends State<CarrosselImagens> {
     super.dispose();
   }
 
+  /// Abre a imagem em tela cheia com fundo escurecido para melhor visualização.
+  void _abrirVisualizadorImagens(int indiceInicial) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return FadeTransition(
+            opacity: animation,
+            child: _VisualizadorImagens(
+              imagens: widget.imagens,
+              indiceInicial: indiceInicial,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Se não houver imagens, exibe um placeholder grande
@@ -54,15 +75,59 @@ class _CarrosselImagensState extends State<CarrosselImagens> {
                 },
                 // Constrói cada página/imagem do carrossel usando Image.memory (bytes)
                 itemBuilder: (context, index) {
-                  return Image.memory(
-                    widget.imagens[index],
-                    fit: BoxFit.cover, // Preenche toda a área disponível
-                    width: double.infinity,
-                    // Caso a imagem não possa ser carregada, exibe placeholder
-                    errorBuilder: (context, error, stackTrace) =>
-                        _buildPlaceholder(),
+                  return GestureDetector(
+                    onTap: () => _abrirVisualizadorImagens(index),
+                    child: Hero(
+                      tag: 'receita_imagem_$index',
+                      child: Image.memory(
+                        widget.imagens[index],
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildPlaceholder(),
+                      ),
+                    ),
                   );
                 },
+              ),
+
+              // Indicador "Toque para ampliar" (canto superior direito)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: IgnorePointer(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.preto.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppColors.branco.withValues(alpha: 0.15),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.zoom_in_rounded,
+                          color: AppColors.dourado,
+                          size: 13,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Toque para ampliar',
+                          style: TextStyle(
+                            color: AppColors.branco,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
 
               // Seta esquerda - só exibe se não estiver na primeira imagem
@@ -179,6 +244,250 @@ class _CarrosselImagensState extends State<CarrosselImagens> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Visualizador em tela cheia das imagens da receita.
+/// Permite navegação entre imagens, zoom (pinch/duplo toque) e fechar
+/// com botão ou arrastando para baixo.
+class _VisualizadorImagens extends StatefulWidget {
+  final List<Uint8List> imagens;
+  final int indiceInicial;
+
+  const _VisualizadorImagens({
+    required this.imagens,
+    required this.indiceInicial,
+  });
+
+  @override
+  State<_VisualizadorImagens> createState() => _VisualizadorImagensState();
+}
+
+class _VisualizadorImagensState extends State<_VisualizadorImagens> {
+  late final PageController _pageController;
+  late int _paginaAtual;
+  double _arrastoVertical = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _paginaAtual = widget.indiceInicial;
+    _pageController = PageController(initialPage: widget.indiceInicial);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _fechar() {
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalImagens = widget.imagens.length;
+    final opacidadeFundo =
+        (1.0 - (_arrastoVertical.abs() / 400).clamp(0.0, 0.85)).clamp(0.0, 1.0);
+
+    return Scaffold(
+      backgroundColor: Colors.black.withValues(alpha: opacidadeFundo),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Imagens com PageView (swipe horizontal entre elas)
+            GestureDetector(
+              onVerticalDragUpdate: (details) {
+                setState(() {
+                  _arrastoVertical += details.delta.dy;
+                });
+              },
+              onVerticalDragEnd: (details) {
+                if (_arrastoVertical.abs() > 120) {
+                  _fechar();
+                } else {
+                  setState(() => _arrastoVertical = 0);
+                }
+              },
+              child: Transform.translate(
+                offset: Offset(0, _arrastoVertical),
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: totalImagens,
+                  onPageChanged: (index) {
+                    setState(() => _paginaAtual = index);
+                  },
+                  itemBuilder: (context, index) {
+                    return Center(
+                      child: Hero(
+                        tag: 'receita_imagem_$index',
+                        child: InteractiveViewer(
+                          minScale: 1,
+                          maxScale: 5,
+                          child: Image.memory(
+                            widget.imagens[index],
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.broken_image_rounded,
+                                color: AppColors.branco,
+                                size: 60,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Topo: contador + botão fechar
+            Positioned(
+              top: 12,
+              left: 12,
+              right: 12,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (totalImagens > 1)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.branco.withValues(alpha: 0.18),
+                          width: 0.6,
+                        ),
+                      ),
+                      child: Text(
+                        '${_paginaAtual + 1} / $totalImagens',
+                        style: const TextStyle(
+                          color: AppColors.branco,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24),
+                      onTap: _fechar,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.branco.withValues(alpha: 0.2),
+                            width: 0.6,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          color: AppColors.branco,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Setas de navegação
+            if (totalImagens > 1 && _paginaAtual > 0)
+              Positioned(
+                left: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: _buildBotaoSetaModal(
+                    icone: Icons.arrow_back_ios_rounded,
+                    onTap: () => _pageController.previousPage(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeInOut,
+                    ),
+                  ),
+                ),
+              ),
+            if (totalImagens > 1 && _paginaAtual < totalImagens - 1)
+              Positioned(
+                right: 8,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: _buildBotaoSetaModal(
+                    icone: Icons.arrow_forward_ios_rounded,
+                    onTap: () => _pageController.nextPage(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeInOut,
+                    ),
+                  ),
+                ),
+              ),
+
+            // Indicadores na base (bolinhas)
+            if (totalImagens > 1)
+              Positioned(
+                bottom: 24,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(totalImagens, (index) {
+                    final ativo = index == _paginaAtual;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 280),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: ativo ? 22 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        color: ativo
+                            ? AppColors.dourado
+                            : AppColors.branco.withValues(alpha: 0.4),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBotaoSetaModal({
+    required IconData icone,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.55),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.branco.withValues(alpha: 0.18),
+              width: 0.6,
+            ),
+          ),
+          child: Icon(icone, color: AppColors.branco, size: 22),
+        ),
       ),
     );
   }

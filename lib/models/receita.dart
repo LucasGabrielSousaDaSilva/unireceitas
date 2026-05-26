@@ -29,6 +29,10 @@ class Receita {
   /// ID do usuário proprietário da receita
   final String proprietarioId;
 
+  /// Data de criação da receita (vem do Supabase `created_at`).
+  /// Pode ser nulo para receitas legadas que não possuem essa informação.
+  final DateTime? createdAt;
+
   /// Construtor da classe Receita.
   /// O [id] é gerado automaticamente usando o timestamp atual caso não seja fornecido.
   Receita({
@@ -39,6 +43,7 @@ class Receita {
     required this.modoPreparo,
     this.acesso = AcessoReceita.privada,
     required this.proprietarioId,
+    this.createdAt,
   })  : id = id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         imagens = imagens ?? [];
 
@@ -82,6 +87,7 @@ class Receita {
       modoPreparo: modoPreparo ?? this.modoPreparo,
       acesso: acesso ?? this.acesso,
       proprietarioId: proprietarioId,
+      createdAt: createdAt,
     );
   }
 }

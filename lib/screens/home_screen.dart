@@ -13,6 +13,13 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+enum OrdenacaoReceitas {
+  nomeAsc,
+  nomeDesc,
+  dataDesc,
+  dataAsc,
+}
+
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
@@ -23,6 +30,11 @@ class _HomeScreenState extends State<HomeScreen>
   // Paginação para aba de minhas receitas
   int _paginaMinhas = 0;
   static const int _itensPorPagina = 10;
+
+  // Ordenação e filtros da aba "Compartilhadas"
+  OrdenacaoReceitas _ordenacao = OrdenacaoReceitas.dataDesc;
+  DateTime? _dataInicio;
+  DateTime? _dataFim;
 
   @override
   void initState() {
@@ -473,77 +485,81 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-            // Filtros
-            SizedBox(
-              height: 44,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                children: [
-                  _buildFilterChip('Todos'),
-                  _buildFilterChip('Rápidas'),
-                  _buildFilterChip('Fáceis'),
-                  _buildFilterChip('Saudáveis'),
-                  _buildFilterChip('Festas'),
-                ],
-              ),
-            ),
+            // Barra de ordenação + filtro de período
+            _buildBarraOrdenacaoFiltro(),
+            // Chip do período ativo
+            if (_dataInicio != null || _dataFim != null)
+              _buildChipPeriodoAtivo(),
             const SizedBox(height: 4),
             // Grid de Receitas
             Expanded(
-              child: todasCompartilhadas.isEmpty
-                  ? _buildListaVazia(
+              child: Builder(
+                builder: (context) {
+                  final lista = _aplicarOrdenacaoFiltro(todasCompartilhadas);
+                  if (lista.isEmpty) {
+                    final temFiltro =
+                        _dataInicio != null || _dataFim != null;
+                    return _buildListaVazia(
                       _termoBusca.isNotEmpty
                           ? 'Nenhuma receita encontrada'
-                          : 'Nenhuma receita compartilhada',
+                          : temFiltro
+                              ? 'Nenhuma receita no período'
+                              : 'Nenhuma receita compartilhada',
                       _termoBusca.isNotEmpty
                           ? 'Tente buscar por outro nome.'
-                          : 'Receitas públicas aparecerão aqui.',
+                          : temFiltro
+                              ? 'Ajuste o filtro de datas para ver mais resultados.'
+                              : 'Receitas públicas aparecerão aqui.',
                       icone: _termoBusca.isNotEmpty
                           ? Icons.search_off_rounded
-                          : Icons.groups_rounded,
-                    )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final width = constraints.maxWidth;
-                        final crossAxis = width >= 1100
-                            ? 4
-                            : width >= 760
-                                ? 3
-                                : 2;
-                        return GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxis,
-                            childAspectRatio: 0.82,
-                            crossAxisSpacing: 14,
-                            mainAxisSpacing: 14,
-                          ),
-                          itemCount: todasCompartilhadas.length,
-                          itemBuilder: (context, index) {
-                            final receita = todasCompartilhadas[index];
-                            return TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0, end: 1),
-                              duration: Duration(
-                                  milliseconds:
-                                      280 + (index * 40).clamp(0, 280)),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, value, child) {
-                                return Opacity(
-                                  opacity: value,
-                                  child: Transform.translate(
-                                    offset: Offset(0, (1 - value) * 14),
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              child: _buildRecipeImageCard(context, receita),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                          : temFiltro
+                              ? Icons.event_busy_rounded
+                              : Icons.groups_rounded,
+                    );
+                  }
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = constraints.maxWidth;
+                      final crossAxis = width >= 1100
+                          ? 4
+                          : width >= 760
+                              ? 3
+                              : 2;
+                      return GridView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxis,
+                          childAspectRatio: 0.82,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                        ),
+                        itemCount: lista.length,
+                        itemBuilder: (context, index) {
+                          final receita = lista[index];
+                          return TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: 1),
+                            duration: Duration(
+                                milliseconds:
+                                    280 + (index * 40).clamp(0, 280)),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) {
+                              return Opacity(
+                                opacity: value,
+                                child: Transform.translate(
+                                  offset: Offset(0, (1 - value) * 14),
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: _buildRecipeImageCard(context, receita),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         );
@@ -551,40 +567,337 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// Widget para o chip de filtro
-  Widget _buildFilterChip(String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            // Implementar filtros aqui
-          },
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.branco,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppColors.cinza.withValues(alpha: 0.2),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.preto.withValues(alpha: 0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+  // =================== ORDENAÇÃO E FILTROS DE PERÍODO ===================
+
+  /// Aplica filtro de data e ordenação na lista de receitas.
+  List<Receita> _aplicarOrdenacaoFiltro(List<Receita> receitas) {
+    // Filtro por período (data de criação)
+    final filtradas = receitas.where((r) {
+      if (_dataInicio == null && _dataFim == null) return true;
+      final data = r.createdAt;
+      if (data == null) return false;
+      final apenasData = DateTime(data.year, data.month, data.day);
+      if (_dataInicio != null) {
+        final inicio = DateTime(
+          _dataInicio!.year,
+          _dataInicio!.month,
+          _dataInicio!.day,
+        );
+        if (apenasData.isBefore(inicio)) return false;
+      }
+      if (_dataFim != null) {
+        final fim = DateTime(
+          _dataFim!.year,
+          _dataFim!.month,
+          _dataFim!.day,
+        );
+        if (apenasData.isAfter(fim)) return false;
+      }
+      return true;
+    }).toList();
+
+    // Ordenação
+    filtradas.sort((a, b) {
+      switch (_ordenacao) {
+        case OrdenacaoReceitas.nomeAsc:
+          return a.nome.toLowerCase().compareTo(b.nome.toLowerCase());
+        case OrdenacaoReceitas.nomeDesc:
+          return b.nome.toLowerCase().compareTo(a.nome.toLowerCase());
+        case OrdenacaoReceitas.dataDesc:
+          final da = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final db = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return db.compareTo(da);
+        case OrdenacaoReceitas.dataAsc:
+          final da = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final db = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return da.compareTo(db);
+      }
+    });
+
+    return filtradas;
+  }
+
+  String _rotuloOrdenacao(OrdenacaoReceitas o) {
+    switch (o) {
+      case OrdenacaoReceitas.nomeAsc:
+        return 'Nome (A → Z)';
+      case OrdenacaoReceitas.nomeDesc:
+        return 'Nome (Z → A)';
+      case OrdenacaoReceitas.dataDesc:
+        return 'Mais recentes';
+      case OrdenacaoReceitas.dataAsc:
+        return 'Mais antigas';
+    }
+  }
+
+  IconData _iconeOrdenacao(OrdenacaoReceitas o) {
+    switch (o) {
+      case OrdenacaoReceitas.nomeAsc:
+        return Icons.sort_by_alpha_rounded;
+      case OrdenacaoReceitas.nomeDesc:
+        return Icons.sort_by_alpha_rounded;
+      case OrdenacaoReceitas.dataDesc:
+        return Icons.history_rounded;
+      case OrdenacaoReceitas.dataAsc:
+        return Icons.update_rounded;
+    }
+  }
+
+  String _formatarData(DateTime d) {
+    final dia = d.day.toString().padLeft(2, '0');
+    final mes = d.month.toString().padLeft(2, '0');
+    return '$dia/$mes/${d.year}';
+  }
+
+  Future<void> _mostrarOpcoesOrdenacao() async {
+    final escolha = await showModalBottomSheet<OrdenacaoReceitas>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.branco,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.cinza.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'Ordenar por',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.preto,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...OrdenacaoReceitas.values.map((o) {
+                final selecionado = o == _ordenacao;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(context, o),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: selecionado
+                              ? AppColors.dourado.withValues(alpha: 0.1)
+                              : const Color(0xFFFAF8F3),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: selecionado
+                                ? AppColors.dourado
+                                : AppColors.cinza.withValues(alpha: 0.15),
+                            width: selecionado ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: selecionado
+                                    ? AppColors.dourado
+                                        .withValues(alpha: 0.18)
+                                    : AppColors.cinza.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                _iconeOrdenacao(o),
+                                color: selecionado
+                                    ? AppColors.dourado
+                                    : AppColors.cinza,
+                                size: 19,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _rotuloOrdenacao(o),
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: selecionado
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
+                                  color: AppColors.preto,
+                                ),
+                              ),
+                            ),
+                            if (selecionado)
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: AppColors.dourado,
+                                size: 22,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (escolha != null) {
+      setState(() => _ordenacao = escolha);
+    }
+  }
+
+  Future<void> _selecionarPeriodo() async {
+    final agora = DateTime.now();
+    final intervalo = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(agora.year + 1, 12, 31),
+      initialDateRange: _dataInicio != null && _dataFim != null
+          ? DateTimeRange(start: _dataInicio!, end: _dataFim!)
+          : null,
+      helpText: 'Selecione o período',
+      cancelText: 'Cancelar',
+      confirmText: 'Aplicar',
+      saveText: 'Aplicar',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.vermelho,
+              onPrimary: AppColors.branco,
+              surface: AppColors.branco,
+              onSurface: AppColors.preto,
             ),
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.preto,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (intervalo != null) {
+      setState(() {
+        _dataInicio = intervalo.start;
+        _dataFim = intervalo.end;
+      });
+    }
+  }
+
+  void _limparPeriodo() {
+    setState(() {
+      _dataInicio = null;
+      _dataFim = null;
+    });
+  }
+
+  Widget _buildBarraOrdenacaoFiltro() {
+    final temPeriodo = _dataInicio != null || _dataFim != null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: _BotaoBarra(
+              icone: _iconeOrdenacao(_ordenacao),
+              titulo: 'Ordenar',
+              valor: _rotuloOrdenacao(_ordenacao),
+              destaque: false,
+              onTap: _mostrarOpcoesOrdenacao,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _BotaoBarra(
+              icone: Icons.date_range_rounded,
+              titulo: 'Período',
+              valor: temPeriodo
+                  ? '${_dataInicio != null ? _formatarData(_dataInicio!) : '—'} → ${_dataFim != null ? _formatarData(_dataFim!) : '—'}'
+                  : 'Selecionar datas',
+              destaque: temPeriodo,
+              onTap: _selecionarPeriodo,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChipPeriodoAtivo() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: _limparPeriodo,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.dourado.withValues(alpha: 0.18),
+                    AppColors.douradoClaro.withValues(alpha: 0.6),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.dourado.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.event_rounded,
+                    color: AppColors.dourado,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${_dataInicio != null ? _formatarData(_dataInicio!) : '—'}  →  ${_dataFim != null ? _formatarData(_dataFim!) : '—'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFB8860B),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: AppColors.dourado.withValues(alpha: 0.18),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.dourado,
+                      size: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1017,6 +1330,114 @@ class _HomeScreenState extends State<HomeScreen>
                 ? AppColors.vermelho
                 : AppColors.cinza.withValues(alpha: 0.5),
             size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BotaoBarra extends StatelessWidget {
+  final IconData icone;
+  final String titulo;
+  final String valor;
+  final bool destaque;
+  final VoidCallback onTap;
+
+  const _BotaoBarra({
+    required this.icone,
+    required this.titulo,
+    required this.valor,
+    required this.destaque,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.branco,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: destaque
+                  ? AppColors.dourado.withValues(alpha: 0.55)
+                  : AppColors.cinza.withValues(alpha: 0.18),
+              width: destaque ? 1.5 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.preto.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: destaque
+                        ? [
+                            AppColors.dourado.withValues(alpha: 0.25),
+                            AppColors.douradoClaro.withValues(alpha: 0.55),
+                          ]
+                        : [
+                            AppColors.dourado.withValues(alpha: 0.18),
+                            AppColors.douradoClaro.withValues(alpha: 0.5),
+                          ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icone, color: AppColors.dourado, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      titulo,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: AppColors.cinza.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      valor,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: destaque
+                            ? const Color(0xFFB8860B)
+                            : AppColors.preto,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.cinza.withValues(alpha: 0.7),
+                size: 18,
+              ),
+            ],
           ),
         ),
       ),

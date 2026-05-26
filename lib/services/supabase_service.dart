@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/usuario.dart';
@@ -214,6 +215,30 @@ class SupabaseService {
 
   // ===================== OPERAÇÕES DE RECEITAS =====================
 
+  /// Baixa os bytes das imagens a partir da string CSV de URLs salva
+  /// na coluna `imagens` da tabela de receitas. Imagens que falharem ao
+  /// baixar são silenciosamente ignoradas — o restante segue.
+  Future<List<Uint8List>> _baixarImagens(String? urlsCsv) async {
+    if (urlsCsv == null || urlsCsv.trim().isEmpty) return [];
+    final urls = urlsCsv
+        .split(',')
+        .map((u) => u.trim())
+        .where((u) => u.isNotEmpty)
+        .toList();
+    final List<Uint8List> bytes = [];
+    for (final url in urls) {
+      try {
+        final resp = await http.get(Uri.parse(url));
+        if (resp.statusCode == 200) {
+          bytes.add(resp.bodyBytes);
+        }
+      } catch (_) {
+        // Ignora falhas individuais para não bloquear o carregamento.
+      }
+    }
+    return bytes;
+  }
+
   /// Cria uma nova receita
   Future<Receita> criarReceita({
     String? id,
@@ -278,24 +303,38 @@ class SupabaseService {
     }
   }
 
+  /// Converte com segurança o valor `created_at` vindo do Supabase em DateTime.
+  DateTime? _parseCreatedAt(dynamic valor) {
+    if (valor == null) return null;
+    if (valor is DateTime) return valor;
+    if (valor is String && valor.isNotEmpty) {
+      return DateTime.tryParse(valor);
+    }
+    return null;
+  }
+
   /// Obtém todas as receitas
   Future<List<Receita>> obterReceitas() async {
     try {
       final response =
           await _usuario.from(SupabaseConfig.receitasTable).select();
-      return (response as List)
-          .map((r) => Receita(
-                id: r['id'] ?? '',
-                nome: r['nome'] ?? '',
-                ingredientes: r['ingredientes'] ?? '',
-                modoPreparo: r['modo_preparo'] ?? '',
-                proprietarioId: r['proprietario_id'] ?? '',
-                acesso: r['acesso'] == 'publica'
-                    ? AcessoReceita.publica
-                    : AcessoReceita.privada,
-                // favorita: r['favorita'] ?? false,
-              ))
-          .toList();
+      final List<Receita> receitas = [];
+      for (final r in (response as List)) {
+        final imagens = await _baixarImagens(r['imagens'] as String?);
+        receitas.add(Receita(
+          id: r['id'] ?? '',
+          nome: r['nome'] ?? '',
+          ingredientes: r['ingredientes'] ?? '',
+          modoPreparo: r['modo_preparo'] ?? '',
+          proprietarioId: r['proprietario_id'] ?? '',
+          acesso: r['acesso'] == 'publica'
+              ? AcessoReceita.publica
+              : AcessoReceita.privada,
+          imagens: imagens,
+          createdAt: _parseCreatedAt(r['created_at']),
+        ));
+      }
+      return receitas;
     } catch (e) {
       throw Exception('Erro ao obter receitas: $e');
     }
@@ -308,20 +347,23 @@ class SupabaseService {
           .from(SupabaseConfig.receitasTable)
           .select()
           .eq('proprietario_id', usuarioId);
-      return (response as List)
-          .map((r) => Receita(
-                id: r['id'] ?? '',
-                nome: r['nome'] ?? '',
-                ingredientes: r['ingredientes'] ?? '',
-                modoPreparo: r['modo_preparo'] ?? '',
-                // tempoPreparacao: r['tempo_preparo'] ?? '',
-                proprietarioId: r['proprietario_id'] ?? '',
-                acesso: r['acesso'] == 'publica'
-                    ? AcessoReceita.publica
-                    : AcessoReceita.privada,
-                // favorita: r['favorita'] ?? false,
-              ))
-          .toList();
+      final List<Receita> receitas = [];
+      for (final r in (response as List)) {
+        final imagens = await _baixarImagens(r['imagens'] as String?);
+        receitas.add(Receita(
+          id: r['id'] ?? '',
+          nome: r['nome'] ?? '',
+          ingredientes: r['ingredientes'] ?? '',
+          modoPreparo: r['modo_preparo'] ?? '',
+          proprietarioId: r['proprietario_id'] ?? '',
+          acesso: r['acesso'] == 'publica'
+              ? AcessoReceita.publica
+              : AcessoReceita.privada,
+          imagens: imagens,
+          createdAt: _parseCreatedAt(r['created_at']),
+        ));
+      }
+      return receitas;
     } catch (e) {
       throw Exception('Erro ao buscar receitas do usuário: $e');
     }
@@ -334,20 +376,23 @@ class SupabaseService {
           .from(SupabaseConfig.receitasTable)
           .select()
           .eq('acesso', 'publica');
-      return (response as List)
-          .map((r) => Receita(
-                id: r['id'] ?? '',
-                nome: r['nome'] ?? '',
-                ingredientes: r['ingredientes'] ?? '',
-                modoPreparo: r['modo_preparo'] ?? '',
-                // tempoPreparacao: r['tempo_preparo'] ?? '',
-                proprietarioId: r['proprietario_id'] ?? '',
-                acesso: r['acesso'] == 'publica'
-                    ? AcessoReceita.publica
-                    : AcessoReceita.privada,
-                // favorita: r['favorita'] ?? false,
-              ))
-          .toList();
+      final List<Receita> receitas = [];
+      for (final r in (response as List)) {
+        final imagens = await _baixarImagens(r['imagens'] as String?);
+        receitas.add(Receita(
+          id: r['id'] ?? '',
+          nome: r['nome'] ?? '',
+          ingredientes: r['ingredientes'] ?? '',
+          modoPreparo: r['modo_preparo'] ?? '',
+          proprietarioId: r['proprietario_id'] ?? '',
+          acesso: r['acesso'] == 'publica'
+              ? AcessoReceita.publica
+              : AcessoReceita.privada,
+          imagens: imagens,
+          createdAt: _parseCreatedAt(r['created_at']),
+        ));
+      }
+      return receitas;
     } catch (e) {
       throw Exception('Erro ao buscar receitas públicas: $e');
     }
