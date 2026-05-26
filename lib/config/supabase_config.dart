@@ -13,12 +13,11 @@ class SupabaseConfig {
   static const String receitasTable = 'receitas';
 
   /// URL de redirect para o fluxo de recuperação de senha.
-  /// - Em mobile/desktop é tratado como deep link (precisa estar registrado
-  ///   nos esquemas nativos e como Redirect URL no painel Supabase →
-  ///   Authentication → URL Configuration).
-  /// - Em web, use a URL pública do app (ex.: https://app.unireceitas.com/reset).
+  /// Configurada para desenvolvimento local em Chrome — a mesma URL precisa
+  /// estar cadastrada em Authentication → URL Configuration → Redirect URLs.
+  /// A porta precisa bater com a usada em `flutter run -d chrome --web-port=8080`.
   static const String passwordRecoveryRedirect =
-      'io.supabase.unireceitas://reset-callback/';
+      'http://localhost:8080/#/redefinir-senha';
 
   /// Valida se as credenciais foram configuradas
   static bool get isConfigured {

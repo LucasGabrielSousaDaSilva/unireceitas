@@ -63,13 +63,37 @@ class AuthService {
     }
   }
 
-  /// Busca um usuário por email e senha (login)
-  Future<Usuario?> buscarUsuarioPorCredenciais(String email, String senha) async {
+  /// Autentica um usuário via Supabase Auth.
+  ///
+  /// O Supabase é a fonte da verdade da senha (armazenada como hash).
+  /// Em sucesso, busca o restante dos dados (nome) na tabela `usuarios`
+  /// e atualiza o cache local em memória.
+  Future<Usuario?> buscarUsuarioPorCredenciais(
+      String email, String senha) async {
     try {
-      final usuario = _usuarios.firstWhere(
-        (u) => u.email.toLowerCase() == email.toLowerCase() && u.senha == senha,
+      final authUser =
+          await _supabase.autenticar(email: email, senha: senha);
+      if (authUser == null) return null;
+
+      Usuario? usuario;
+      try {
+        usuario = await _supabase.buscarUsuarioPorEmail(email);
+      } catch (_) {
+        usuario = null;
+      }
+      usuario ??= Usuario(
+        id: authUser.id,
+        nome: authUser.email ?? email,
+        email: email,
+        senha: senha,
       );
-      await _sync.autenticarUsuario(email, senha);
+
+      final idx = _usuarios.indexWhere((u) => u.id == usuario!.id);
+      if (idx >= 0) {
+        _usuarios[idx] = usuario;
+      } else {
+        _usuarios.add(usuario);
+      }
       return usuario;
     } catch (e) {
       return null;

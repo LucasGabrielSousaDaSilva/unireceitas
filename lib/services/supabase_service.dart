@@ -6,32 +6,37 @@ import '../models/receita.dart';
 
 /// SupabaseService - Gerencia todas as operações com Supabase
 class SupabaseService {
-  late final SupabaseClient _usuario;
-  bool _isInitialized = false;
+  /// Acessa o cliente global do Supabase.
+  /// A inicialização real acontece uma única vez em [main] via
+  /// `Supabase.initialize(...)`, então qualquer instância de
+  /// [SupabaseService] compartilha o mesmo cliente.
+  SupabaseClient get _usuario => Supabase.instance.client;
 
-  /// Inicializa a conexão com Supabase
+  /// Mantido por compatibilidade com chamadas existentes. A inicialização
+  /// efetiva é feita no `main()`; aqui só validamos que o cliente já
+  /// está disponível.
   Future<void> inicializar() async {
-    if (_isInitialized) return;
-
     if (!SupabaseConfig.isConfigured) {
       throw Exception(
           'Supabase não está configurado. Defina as credenciais em lib/config/supabase_config.dart');
     }
-
     try {
-      await Supabase.initialize(
-        url: SupabaseConfig.supabaseUrl,
-        anonKey: SupabaseConfig.supabaseKey,
-      );
-      _usuario = Supabase.instance.client;
-      _isInitialized = true;
+      // Apenas força o acesso ao cliente para falhar cedo se não inicializado.
+      Supabase.instance.client;
     } catch (e) {
-      throw Exception('Erro ao inicializar Supabase: $e');
+      throw Exception('Supabase não foi inicializado em main(): $e');
     }
   }
 
   /// Verifica se está conectado ao Supabase
-  bool get isConnected => _isInitialized;
+  bool get isConnected {
+    try {
+      Supabase.instance.client;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   // ===================== OPERAÇÕES DE USUÁRIOS =====================
 

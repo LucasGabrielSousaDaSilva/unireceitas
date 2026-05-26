@@ -41,14 +41,16 @@ void main() async {
   final receitaProvider = ReceitaProvider();
 
   try {
-    await DatabaseHelper.instance.database;
-    await SyncService.instance.inicializar();
-    await authProvider.inicializar();
-    await receitaProvider.inicializar();
+    // Supabase precisa ser inicializado ANTES de qualquer serviço que
+    // dependa de `Supabase.instance.client`.
     await Supabase.initialize(
       url: SupabaseConfig.supabaseUrl,
       anonKey: SupabaseConfig.supabaseKey,
     );
+    await DatabaseHelper.instance.database;
+    await SyncService.instance.inicializar();
+    await authProvider.inicializar();
+    await receitaProvider.inicializar();
   } catch (e) {
     debugPrint('Erro ao inicializar aplicativo: $e');
   }
