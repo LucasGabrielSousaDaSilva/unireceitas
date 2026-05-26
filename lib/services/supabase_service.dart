@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/usuario.dart';
@@ -50,6 +51,7 @@ class SupabaseService {
 
       // Insere dados adicionais na tabela usuarios
       final usuario = Usuario(
+        id: user.id,
         nome: nome,
         email: email,
         senha: senha,
@@ -155,11 +157,39 @@ class SupabaseService {
     required String modopreparo,
     required String proprietarioId,
     AcessoReceita acesso = AcessoReceita.privada,
+    List<Uint8List>? imagens,
   }) async {
     try {
+      String imagensUrls = '';
+      
+      // Upload das imagens para o Storage e geração das URLs
+      if (imagens != null && imagens.isNotEmpty) {
+        final List<String> urls = [];
+        for (var i = 0; i < imagens.length; i++) {
+          final imageData = imagens[i];
+          final fileName = '${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          final filePath = '$proprietarioId/$fileName';
+
+          try {
+            await _usuario.storage.from('receitas-imagens').uploadBinary(
+              filePath,
+              imageData,
+              fileOptions: const FileOptions(contentType: 'image/jpeg'),
+            );
+            final imageUrl = _usuario.storage.from('receitas-imagens').getPublicUrl(filePath);
+            urls.add(imageUrl);
+          } catch (e) {
+            // ignore: avoid_print
+            print('Erro ao subir imagem: $e');
+          }
+        }
+        imagensUrls = urls.join(',');
+      }
+
       final receita = Receita(
         id: id,
         nome: nome,
+        imagens: imagens ?? [],
         ingredientes: ingredientes,
         modoPreparo: modopreparo,
         proprietarioId: proprietarioId,
@@ -173,7 +203,7 @@ class SupabaseService {
         'modo_preparo': modopreparo,
         'proprietario_id': proprietarioId,
         'acesso': acesso.toString().split('.').last,
-        'favorita': false,
+        'imagens': imagensUrls,
         'created_at': DateTime.now().toIso8601String(),
       });
 
@@ -265,18 +295,52 @@ class SupabaseService {
     required String ingredientes,
     required String modoPreparo,
     // required String tempoPreparacao,
-    required AcessoReceita acesso, required String modopreparo,
+    required AcessoReceita acesso,
+    required String proprietarioId,
+    List<Uint8List>? imagens,
   }) async {
     try {
+      String? imagensUrls;
+      
+      // Upload das imagens para o Storage e geração das URLs se houver imagens
+      if (imagens != null && imagens.isNotEmpty) {
+        final List<String> urls = [];
+        for (var i = 0; i < imagens.length; i++) {
+          final imageData = imagens[i];
+          final fileName = '${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          final filePath = '$proprietarioId/$fileName';
+
+          try {
+            await _usuario.storage.from('receitas-imagens').uploadBinary(
+              filePath,
+              imageData,
+              fileOptions: const FileOptions(contentType: 'image/jpeg'),
+            );
+            final imageUrl = _usuario.storage.from('receitas-imagens').getPublicUrl(filePath);
+            urls.add(imageUrl);
+          } catch (e) {
+            // ignore: avoid_print
+            print('Erro ao subir imagem: $e');
+          }
+        }
+        imagensUrls = urls.join(',');
+      }
+
+      final updateData = {
+        'nome': nome,
+        'ingredientes': ingredientes,
+        'modo_preparo': modoPreparo,
+        // 'tempo_preparo': tempoPreparacao,
+        'acesso': acesso.toString().split('.').last,
+      };
+
+      if (imagensUrls != null) {
+        updateData['imagens'] = imagensUrls;
+      }
+
       await _usuario
           .from(SupabaseConfig.receitasTable)
-          .update({
-            'nome': nome,
-            'ingredientes': ingredientes,
-            'modo_preparo': modoPreparo,
-            // 'tempo_preparo': tempoPreparacao,
-            'acesso': acesso.toString().split('.').last,
-          })
+          .update(updateData)
           .eq('id', receitaId);
     } catch (e) {
       throw Exception('Erro ao atualizar receita: $e');

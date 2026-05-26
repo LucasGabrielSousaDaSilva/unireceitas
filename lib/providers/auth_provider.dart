@@ -48,7 +48,7 @@ class AuthProvider extends ChangeNotifier {
   /// Realiza o login
   Future<String?> login({required String email, required String senha}) async {
     try {
-      _usuarioLogado = _authService.buscarUsuarioPorCredenciais(email, senha);
+      _usuarioLogado = await _authService.buscarUsuarioPorCredenciais(email, senha);
       if (_usuarioLogado == null) {
         return 'Email ou senha incorretos.';
       }

@@ -7,6 +7,13 @@ import '../services/supabase_service.dart';
 /// SyncService - Gerencia sincronização entre SQLite e Supabase
 /// Implementa padrão Offline-First com sincronização automática
 class SyncService {
+  // Padrão Singleton
+  static final SyncService _instance = SyncService._internal();
+  factory SyncService() => _instance;
+  SyncService._internal();
+
+  static SyncService get instance => _instance;
+
   final DatabaseHelper _localDb = DatabaseHelper.instance;
   final SupabaseService _remoteDb = SupabaseService();
   final Connectivity _connectivity = Connectivity();
@@ -106,6 +113,7 @@ class SyncService {
             // tempo_preparo: receita.tempoPreparacao,
             proprietarioId: receita.proprietarioId,
             acesso: receita.acesso,
+            imagens: receita.imagens,
           );
         }
       }
@@ -138,22 +146,38 @@ class SyncService {
     return await _localDb.getUsuarios();
   }
 
-  /// Insere usuário com sincronização automática
-  Future<void> inserirUsuario(Usuario usuario) async {
-    // Sempre salva localmente
-    await _localDb.insertUsuario(usuario);
+  /// Insere usuário com sincronização automática e retorna o usuário (com ID correto do Supabase se online)
+  Future<Usuario> inserirUsuario(Usuario usuario) async {
+    Usuario usuarioParaSalvar = usuario;
 
-    // Tenta sincronizar se online
+    // Tenta sincronizar se online PRIMEIRO para pegar o ID gerado pelo Supabase Auth
     if (_isOnline && supabaseDisponivel) {
       try {
-        await _remoteDb.criarUsuario(
+        final usuarioRemoto = await _remoteDb.criarUsuario(
           nome: usuario.nome,
           email: usuario.email,
           senha: usuario.senha,
         );
+        usuarioParaSalvar = usuarioRemoto;
       } catch (e) {
         // ignore: avoid_print
         print('Aviso: não sincronizou com remoto: $e');
+      }
+    }
+
+    // Sempre salva localmente, mas com o ID correto (se conseguiu sincronizar)
+    await _localDb.insertUsuario(usuarioParaSalvar);
+    return usuarioParaSalvar;
+  }
+
+  /// Autentica usuário
+  Future<void> autenticarUsuario(String email, String senha) async {
+    if (_isOnline && supabaseDisponivel) {
+      try {
+        await _remoteDb.autenticar(email: email, senha: senha);
+      } catch (e) {
+        // ignore: avoid_print
+        print('Aviso: não autenticou no remoto: $e');
       }
     }
   }
@@ -198,6 +222,7 @@ class SyncService {
           // tempo_preparo: receita.tempoPreparacao,
           proprietarioId: receita.proprietarioId,
           acesso: receita.acesso,
+          imagens: receita.imagens,
         );
       } catch (e) {
         // ignore: avoid_print
@@ -218,9 +243,11 @@ class SyncService {
           receitaId: receita.id,
           nome: receita.nome,
           ingredientes: receita.ingredientes,
-          modopreparo: receita.modoPreparo,
+          modoPreparo: receita.modoPreparo,
           // tempoPreparacao: receita.tempoPreparacao,
-          acesso: receita.acesso, modoPreparo: '',
+          acesso: receita.acesso,
+          proprietarioId: receita.proprietarioId,
+          imagens: receita.imagens,
         );
       } catch (e) {
         // ignore: avoid_print

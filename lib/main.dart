@@ -22,6 +22,7 @@ import 'screens/recursos_screen.dart';
 import 'services/supabase_service.dart';
 import 'services/sync_service.dart';
 import 'utils/app_colors.dart';
+import 'config/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
@@ -40,12 +41,13 @@ void main() async {
 
   try {
     await DatabaseHelper.instance.database;
+    await SyncService.instance.inicializar();
     await authProvider.inicializar();
     await receitaProvider.inicializar();
     await Supabase.initialize(
-    url: 'https://kngdraibfylpszglknks.supabase.co',
-    anonKey: 'sb_publishable_STKWVzE6_DyZVjQIZ3PKfw_Paf62nw-',
-  );
+      url: SupabaseConfig.supabaseUrl,
+      anonKey: SupabaseConfig.supabaseKey,
+    );
   } catch (e) {
     debugPrint('Erro ao inicializar aplicativo: $e');
   }

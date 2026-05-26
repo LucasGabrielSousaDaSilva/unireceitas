@@ -1,16 +1,16 @@
 import '../models/receita.dart';
-import '../database/database_helper.dart';
+import '../services/sync_service.dart';
 
 /// ReceitaService - Camada de Serviço de Receitas
 /// Responsável pela lógica de negócio de gerenciamento de receitas
 class ReceitaService {
-  final DatabaseHelper _db = DatabaseHelper.instance;
+  final SyncService _sync = SyncService.instance;
   final List<Receita> _receitas = [];
 
   /// Inicializa o serviço carregando receitas do banco de dados
   Future<void> inicializar() async {
     try {
-      final receitas = await _db.getReceitas();
+      final receitas = await _sync.obterReceitas();
       _receitas.clear();
       _receitas.addAll(receitas);
     } catch (e) {
@@ -83,7 +83,7 @@ class ReceitaService {
   Future<Receita> adicionarReceita(Receita receita) async {
     _receitas.add(receita);
     try {
-      await _db.insertReceita(receita);
+      await _sync.inserirReceita(receita);
     } catch (e) {
       _receitas.remove(receita);
       throw Exception('Erro ao adicionar receita: $e');
@@ -100,7 +100,7 @@ class ReceitaService {
 
     _receitas[index] = receitaAtualizada;
     try {
-      await _db.updateReceita(receitaAtualizada);
+      await _sync.atualizarReceita(receitaAtualizada);
     } catch (e) {
       // Reverte a mudança em caso de erro
       _receitas[index] = _receitas[index];
@@ -118,7 +118,7 @@ class ReceitaService {
 
     final receitaRemovida = _receitas.removeAt(index);
     try {
-      await _db.deleteReceita(id);
+      await _sync.deletarReceita(id);
     } catch (e) {
       // Reverte a remoção em caso de erro
       _receitas.insert(index, receitaRemovida);
@@ -155,7 +155,7 @@ class ReceitaService {
 
     receita.acesso = novoAcesso;
     try {
-      await _db.updateReceita(receita);
+      await _sync.atualizarReceita(receita);
     } catch (e) {
       throw Exception('Erro ao alterar acesso da receita: $e');
     }

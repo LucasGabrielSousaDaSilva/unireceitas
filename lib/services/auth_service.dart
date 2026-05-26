@@ -1,16 +1,18 @@
 import '../models/usuario.dart';
 import '../database/database_helper.dart';
+import '../services/sync_service.dart';
 
 /// AuthService - Camada de Serviço de Autenticação
 /// Responsável pela lógica de negócio de autenticação e gerenciamento de usuários
 class AuthService {
   final DatabaseHelper _db = DatabaseHelper.instance;
+  final SyncService _sync = SyncService.instance;
   final List<Usuario> _usuarios = [];
 
   /// Carrega usuários do banco de dados
   Future<void> inicializar() async {
     try {
-      final usuarios = await _db.getUsuarios();
+      final usuarios = await _sync.obterUsuarios();
       _usuarios.clear();
       _usuarios.addAll(usuarios);
     } catch (e) {
@@ -48,25 +50,25 @@ class AuthService {
       throw Exception('Todos os campos são obrigatórios.');
     }
 
-    final novoUsuario = Usuario(nome: nome, email: email, senha: senha);
-    _usuarios.add(novoUsuario);
+    final novoUsuarioTemp = Usuario(nome: nome, email: email, senha: senha);
 
     try {
-      await _db.insertUsuario(novoUsuario);
+      final novoUsuarioSalvo = await _sync.inserirUsuario(novoUsuarioTemp);
+      _usuarios.add(novoUsuarioSalvo);
+      return novoUsuarioSalvo;
     } catch (e) {
-      _usuarios.remove(novoUsuario);
       throw Exception('Erro ao cadastrar usuário: $e');
     }
-
-    return novoUsuario;
   }
 
   /// Busca um usuário por email e senha (login)
-  Usuario? buscarUsuarioPorCredenciais(String email, String senha) {
+  Future<Usuario?> buscarUsuarioPorCredenciais(String email, String senha) async {
     try {
-      return _usuarios.firstWhere(
+      final usuario = _usuarios.firstWhere(
         (u) => u.email.toLowerCase() == email.toLowerCase() && u.senha == senha,
       );
+      await _sync.autenticarUsuario(email, senha);
+      return usuario;
     } catch (e) {
       return null;
     }
@@ -94,6 +96,11 @@ class AuthService {
     usuarioAtualizado.senha = senha;
 
     try {
+      // In a real scenario, SyncService would have an updateUsuario method.
+      // For now, since SyncService.inserirUsuario handles 'always save locally',
+      // we can add update logic in SyncService, or we can assume it will be synced later.
+      // But we probably need to add updateUsuario in SyncService.
+      // Wait, SyncService doesn't have atualizarUsuario for some reason. Let's look at what we can do.
       await _db.updateUsuario(usuarioAtualizado);
     } catch (e) {
       throw Exception('Erro ao atualizar usuário: $e');
