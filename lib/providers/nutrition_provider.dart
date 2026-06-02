@@ -32,10 +32,11 @@ class NutritionProvider extends ChangeNotifier {
   // ===================== OPERAÇÕES =====================
 
   /// Busca informações nutricionais de um alimento
-  Future<FoodInfo?> buscarAlimento(String nomeAlimento) async {
+  Future<FoodInfo?> buscarAlimento(String nomeAlimento, {String? quantity}) async {
     // Verifica cache primeiro
-    if (_cache.containsKey(nomeAlimento)) {
-      return _cache[nomeAlimento];
+    final cacheKey = quantity == null || quantity.isEmpty ? nomeAlimento : '$nomeAlimento|$quantity';
+    if (_cache.containsKey(cacheKey)) {
+      return _cache[cacheKey];
     }
 
     _carregando = true;
@@ -43,16 +44,20 @@ class NutritionProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final info = await _nutritionService.buscarAlimento(nomeAlimento);
+      final info = await _nutritionService.buscarAlimento(nomeAlimento, quantity: quantity);
 
       if (info != null) {
-        _cache[nomeAlimento] = info;
+        _cache[cacheKey] = info;
       } else {
-        _erro = 'Alimento "$nomeAlimento" não encontrado';
+        _erro = 'Alimento "${nomeAlimento}" não encontrado';
       }
 
       notifyListeners();
       return info;
+    } on NutritionApiException catch (e) {
+      _erro = e.message;
+      notifyListeners();
+      return null;
     } catch (e) {
       _erro = 'Erro ao buscar alimento: $e';
       notifyListeners();

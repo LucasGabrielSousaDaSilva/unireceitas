@@ -12,10 +12,10 @@ class AIService {
   Future<void> inicializar() async {
     if (_isInitialized) return;
 
-    if (_apiKey == 'YOUR_GEMINI_API_KEY') {
+    // Avise apenas se a chave não foi configurada (vazia ou placeholder)
+    if (_apiKey.trim().isEmpty || _apiKey.contains('YOUR')) {
       throw Exception(
-        'API Key do Google Generative AI não configurada. '
-        'Configure em lib/services/ai_service.dart',
+        'API Key do Google Generative AI não configurada. Configure em lib/services/ai_service.dart',
       );
     }
 

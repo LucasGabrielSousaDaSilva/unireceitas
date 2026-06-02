@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/ai_provider.dart';
 import '../providers/nutrition_provider.dart';
-import '../providers/calendar_provider.dart';
 import '../services/nutrition_service.dart';
 import '../utils/app_colors.dart';
+import '../widgets/nutrition_table_widget.dart';
 
 class RecursosScreen extends StatefulWidget {
   const RecursosScreen({super.key});
@@ -18,13 +18,9 @@ class RecursosScreen extends StatefulWidget {
 class _RecursosScreenState extends State<RecursosScreen> {
   final TextEditingController _ingredientesController = TextEditingController();
   final TextEditingController _alimentoController = TextEditingController();
-  final TextEditingController _accessTokenController = TextEditingController();
-  final TextEditingController _tituloLembreteController = TextEditingController();
-  final TextEditingController _itensLembreteController = TextEditingController();
-
   FoodInfo? _ultimoAlimentoEncontrado;
   bool _dadosIniciaisCarregados = false;
-  DateTime _dataLembrete = DateTime.now().add(const Duration(days: 1));
+  
 
   @override
   void didChangeDependencies() {
@@ -42,80 +38,40 @@ class _RecursosScreenState extends State<RecursosScreen> {
   void dispose() {
     _ingredientesController.dispose();
     _alimentoController.dispose();
-    _accessTokenController.dispose();
-    _tituloLembreteController.dispose();
-    _itensLembreteController.dispose();
     super.dispose();
   }
 
   Future<void> _buscarInfoNutricional() async {
-    final nome = _alimentoController.text.trim();
-    if (nome.isEmpty) return;
+    final input = _alimentoController.text.trim();
+    if (input.isEmpty) return;
+
+    // Tenta separar quantidade (ex: "2lbs chicken", "chicken 2 lbs", "100 g arroz")
+    String? quantity;
+    String query = input;
+
+    final regex = RegExp(r'(\d+[\d\.,]*\s*(?:kg|g|lbs?|lb|oz|ml|l|tbsp|tsp|cup|cups|xícara|xicaras|colher|colheres))', caseSensitive: false);
+    final match = regex.firstMatch(input);
+    if (match != null) {
+      quantity = match.group(0)?.trim();
+      query = input.replaceFirst(match.group(0)!, '').trim();
+      if (query.isEmpty) {
+        // se o input era apenas quantidade + alimento e a ordem estava invertida, tente buscar palavra restante
+        final parts = input.split(RegExp(r'\s+'));
+        // remove o trecho da quantidade
+        for (var i = 0; i < parts.length; i++) {
+          if (parts[i].contains(RegExp(r'\d'))) continue;
+        }
+      }
+    }
 
     final provider = context.read<NutritionProvider>();
-    final info = await provider.buscarAlimento(nome);
+    final info = await provider.buscarAlimento(query, quantity: quantity);
     setState(() {
       _ultimoAlimentoEncontrado = info;
     });
   }
 
-  Future<void> _agendarLembreteFinDeSemana() async {
-    final titulo = _tituloLembreteController.text.trim();
-    final itens = _itensLembreteController.text
-        .split(',')
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
-
-    if (titulo.isEmpty || itens.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Informe título e pelo menos um item para o lembrete.'),
-          backgroundColor: AppColors.vermelho,
-        ),
-      );
-      return;
-    }
-
-    final provider = context.read<CalendarProvider>();
-    await provider.agendarLembreteFinDeSemana(
-      titulo: titulo,
-      itens: itens,
-    );
-  }
-
-  Future<void> _selecionarDataLembrete() async {
-    final localContext = context;
-    final dataSelecionada = await showDatePicker(
-      context: localContext,
-      initialDate: _dataLembrete,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-
-    if (!mounted || dataSelecionada == null) return;
-
-    final horaSelecionada = await showTimePicker(
-      context: localContext,
-      initialTime: TimeOfDay(hour: _dataLembrete.hour, minute: _dataLembrete.minute),
-    );
-
-    if (!mounted || horaSelecionada == null) return;
-
-    setState(() {
-      _dataLembrete = DateTime(
-        dataSelecionada.year,
-        dataSelecionada.month,
-        dataSelecionada.day,
-        horaSelecionada.hour,
-        horaSelecionada.minute,
-      );
-    });
-  }
-
-  String _formatarDataHora(DateTime data) {
-    return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year} ${data.hour.toString().padLeft(2, '0')}:${data.minute.toString().padLeft(2, '0')}';
-  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -128,12 +84,10 @@ class _RecursosScreenState extends State<RecursosScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+            children: [
             _buildSecaoIA(),
             const SizedBox(height: 24),
             _buildSecaoNutricional(),
-            const SizedBox(height: 24),
-            _buildSecaoCalendario(),
           ],
         ),
       ),
@@ -282,14 +236,11 @@ class _RecursosScreenState extends State<RecursosScreen> {
                   ),
                 if (_ultimoAlimentoEncontrado != null)
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 8),
-                      Text(
-                        _ultimoAlimentoEncontrado!.obterFormatado(),
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
+                      NutritionTableWidget(foodInfo: _ultimoAlimentoEncontrado!),
+                      const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
                           provider.adicionarAlimento(_ultimoAlimentoEncontrado!);
@@ -340,141 +291,5 @@ class _RecursosScreenState extends State<RecursosScreen> {
     );
   }
 
-  Widget _buildSecaoCalendario() {
-    return Consumer<CalendarProvider>(
-      builder: (context, provider, child) {
-        return Card(
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Calendário',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _accessTokenController,
-                  decoration: InputDecoration(
-                    labelText: 'Access token do Google Calendar',
-                    helperText: 'Use um token OAuth válido para acessar o calendário.',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: provider.carregando
-                            ? null
-                            : () async {
-                                await provider.inicializar(_accessTokenController.text.trim());
-                              },
-                        child: const Text('Autorizar calendário'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.cinza),
-                      onPressed: provider.carregando
-                          ? null
-                          : () {
-                              _accessTokenController.clear();
-                              provider.limparErro();
-                            },
-                      child: const Text('Limpar'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (provider.carregando) const LinearProgressIndicator(),
-                if (provider.temErro)
-                  Text(
-                    provider.erro ?? 'Erro no calendário',
-                    style: const TextStyle(color: AppColors.vermelho),
-                  ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        provider.temAutorizacao ? 'Calendário autorizado' : 'Ainda não autorizado',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: provider.temAutorizacao ? AppColors.verde : AppColors.cinza,
-                        ),
-                      ),
-                    ),
-                    ElevatedButton(
-                      onPressed: provider.temAutorizacao && !provider.carregando
-                          ? () => provider.carregarLembretes()
-                          : null,
-                      child: const Text('Carregar lembretes'),
-                    ),
-                  ],
-                ),
-                if (provider.temAutorizacao) ...[
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _tituloLembreteController,
-                    decoration: InputDecoration(
-                      labelText: 'Título do lembrete',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _itensLembreteController,
-                    decoration: InputDecoration(
-                      labelText: 'Itens (separados por vírgula)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _selecionarDataLembrete,
-                          child: Text('Data: ${_formatarDataHora(_dataLembrete)}'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: provider.carregando ? null : _agendarLembreteFinDeSemana,
-                        child: const Text('Agendar fim de semana'),
-                      ),
-                    ],
-                  ),
-                  if (provider.lembretes.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Lembretes carregados',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    ...provider.lembretes.asMap().entries.map(
-                          (entry) => ListTile(
-                            tileColor: AppColors.douradoClaro.withValues(alpha: 0.4),
-                            title: Text(entry.value.titulo),
-                            subtitle: Text('Data: ${_formatarDataHora(entry.value.dataLembrete)}'),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: AppColors.vermelho),
-                              onPressed: () => provider.removerLembrete(entry.key),
-                            ),
-                          ),
-                        ),
-                  ],
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  
 }
